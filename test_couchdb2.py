@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Test the Python module to interface with CouchDB (version 2).
+"""Test the Python interface module to CouchDB (version 2).
 Uses py.test.
 """
 
 from __future__ import print_function, unicode_literals
-
-from collections import OrderedDict
 
 import pytest
 
@@ -18,52 +16,51 @@ def test_server():
     with pytest.raises(IOError):
         server = couchdb2.Server('http://localhost:123456/')
 
-def test_database_creation():
+def test_database():
     server = couchdb2.Server()
     count = len(server)
-    name = 'my_test_database'
+    name = 'mytest'
     assert name not in server
-    with pytest.raises(KeyError):
-        server[name]
+    with pytest.raises(couchdb2.NotFoundError):
+        db = server[name]
     db = server.create(name)
     assert name in server
     assert len(server) == count + 1
     with pytest.raises(couchdb2.CreationError):
         another = server.create(name)
     db.destroy()
+    assert not db.exists()
     assert name not in server
-    with pytest.raises(couchdb2.ExistenceError):
+    with pytest.raises(couchdb2.NotFoundError):
         db = server[name]
     assert len(server) == count
 
-def test_document_insert_delete():
-    server = couchdb2.Server()
-    db = server.create('my_test_database')
+def test_document_create():
+    db = couchdb2.Server().create('mytest')
     assert len(db) == 0
-    doc = OrderedDict()
+    doc = {}
     docid = 'hardwired id'
     doc['_id'] = docid
     doc['name'] = 'thingy'
     doc['age'] = 1
     doc1 = doc.copy()
-    db.insert(doc1)
-    keys1 = db.get(docid).keys()
+    db.save(doc1)
+    keys1 = set(db.get(docid).keys())
     assert len(db) == 1
     doc2 = doc.copy()
-    with pytest.raises(couchdb2.CreationError):
-        db.insert(doc2)
-    del db[doc1['_id']]
+    with pytest.raises(couchdb2.RevisionError):
+        db.save(doc2)
+    db.delete(doc1)
     assert doc1['_id'] not in db
     assert len(db) == 0
-    db.insert(doc2)
-    keys2 = db.get(docid).keys()
+    db.save(doc2)
+    keys2 = set(db.get(docid).keys())
     assert keys1 == keys2
     assert len(db) == 1
     db.destroy()
 
 def test_document_update():
-    server = couchdb2.Server()
-    db = server.create('my_test_database')
+    db = couchdb2.Server().create('mytest')
     assert len(db) == 0
     doc = {'name': 'Per', 'age': 59, 'mood': 'OK'}
     doc1 = doc.copy()
@@ -72,11 +69,24 @@ def test_document_update():
     docid = doc1.get('_id')
     assert docid
     doc1['mood'] = 'excellent'
-    db.update(doc1)
+    db.save(doc1)
     doc2 = db[docid]
     assert doc2['mood'] == 'excellent'
     doc3 = doc.copy()
-    docid3, rev = db.insert(doc3)
+    db.save(doc3)
     assert len(db) == 2
-    assert docid != docid3
+    assert docid != doc3['_id']
+    db.destroy()
+
+def test_document_attachments():
+    db = couchdb2.Server().create('mytest')
+    id = 'mydoc'
+    doc = {'_id': id, 'name': 'myfile', 'contents': 'a Python file'}
+    db.save(doc)
+    with open(__file__, 'rb') as infile:
+        db.put_attachment(doc, infile)
+    doc = db[id]
+    attfile = db.get_attachment(doc, __file__)
+    with open(__file__, 'rb') as infile:
+        assert attfile.read() == infile.read()
     db.destroy()
