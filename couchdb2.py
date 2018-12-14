@@ -6,10 +6,10 @@ Relies on requests, http://docs.python-requests.org/en/master/
 from __future__ import print_function, unicode_literals
 
 import mimetypes
-try:
+try:                            # Python 2
     from StringIO import StringIO as ContentFile
     ContentFile.read = ContentFile.getvalue
-except ImportError:
+except ImportError:             # Python 3
     from io import BytesIO as ContentFile
     ContentFile.read = ContentFile.getvalue
 import uuid
@@ -24,7 +24,7 @@ BIN_MIME  = 'application/octet-stream'
 class CouchDB2Exception(Exception):
     "Base CouchDB2 exception class."
 
-class NotFoundError(CouchDB2Exception, KeyError):
+class NotFoundError(KeyError, CouchDB2Exception):
     "No such entity exists."
 
 class CreationError(CouchDB2Exception):
@@ -116,11 +116,17 @@ class Server(object):
                 pass
         return result
 
-    def create(self, name):
-        "Create the named database."
-        database = Database(self, name, check=False)
-        database.create()
-        return database
+    def get(self, name, create=True):
+        """Get the named database.
+        If 'create' is True, then create it if it does not exist.
+        """
+        try:
+            return Database(self, name)
+        except NotFoundError:
+            if create:
+                return Database(self, name, check=False).create()
+            else:
+                raise
 
 
 class Database(object):
@@ -151,7 +157,9 @@ class Database(object):
 
     def __getitem__(self, id):
         """Return the document with the given id.
-        Raise NotFoundError if no such document.
+        Raises AuthorizationError if not privileged to read.
+        Raise NotFoundError if no such document or database.
+        Raises IOError if something else went wrong.
         """
         response = self.server._get(self.name, id)
         if response.status_code == 200:
@@ -275,6 +283,47 @@ class Database(object):
         else:
             raise IOError("{r.status_code} {r.reason}".format(r=response))
 
+    def load_design(self, name, doc):
+        """Load the design document with the given name.
+        If the existing design document is identical, no action and
+        False is returned, else True is returned.
+        See http://docs.couchdb.org/en/latest/api/ddoc/common.html for info
+        on the structure of the ddoc.
+        Raises AuthorizationError if not privileged to read.
+        Raise NotFoundError if no such database.
+        Raises IOError if something else went wrong.
+        """
+        response = self.server._get(self.name, '_design', name)
+        if response.status_code == 200:
+            current_doc = response.json()
+            doc['_id'] = current_doc['_id']
+            doc['_rev'] = current_doc['_rev']
+            if doc == current_doc: return False
+        elif response.status_code == 401:
+            raise AuthorizationError('read privilege required')
+        elif response.status_code == 404:
+            pass
+        else:
+            raise IOError("{r.status_code} {r.reason}".format(r=response))
+        response = self.server._put(self.name, '_design', name, json=doc)
+        if response.status_code in (201, 202):
+            data = response.json()
+            if not data.get('ok'):
+                raise IOError('response not OK')
+            doc['_id'] = data['id']
+            doc['_rev'] = data['rev']
+        elif response.status_code == 400:
+            raise ValueError('invalid request body or parameters')
+        elif response.status_code == 401:
+            raise AuthorizationError('write privilege required')
+        elif response.status_code == 404:
+            raise NotFoundError('no such database')
+        elif response.status_code == 409:
+            raise RevisionError("missing or incorrect '_rev' item")
+        else:
+            raise IOError("{r.status_code} {r.reason}".format(r=response))
+        return True
+
     def put_attachment(self, doc, content, filename=None, content_type=None):
         """'content' is a string or a file-like object.
         If no filename, then an attempt is made to get it from content object.
@@ -320,13 +369,10 @@ class Database(object):
 
 
 if __name__ == '__main__':
-    db = Server().create('mytest')
-    doc = {'name': 'myfile', 'contents': 'a Python file'}
+    db = Server().get('mytest')
+    doc = {'name': 'myfile3', 'contents': 'a Python file'}
     db.save(doc)
-    with open(__file__, 'rb') as infile:
-        db.put_attachment(doc, infile)
-    attfile = db.get_attachment(doc, __file__)
-    attcontent = attfile.read()
-    print(len(attcontent))
-    with open(__file__, 'rb') as infile:
-        assert attcontent == infile.read()
+    print(db.load_design('all', 
+                         {'views':
+                          {'name':
+                           {'map': "function (doc) {emit(doc.name, null);}"}}}))
