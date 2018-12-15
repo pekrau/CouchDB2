@@ -5,6 +5,8 @@ Relies on requests, http://docs.python-requests.org/en/master/
 
 from __future__ import print_function, unicode_literals
 
+import collections
+import json
 import mimetypes
 try:                            # Python 2
     from StringIO import StringIO as ContentFile
@@ -16,10 +18,13 @@ import uuid
 
 import requests
 
-__version__ = '0.3.0'
+__version__ = '0.4.0'
 
 JSON_MIME = 'application/json'
 BIN_MIME  = 'application/octet-stream'
+
+Rows = collections.namedtuple('Rows', ['rows', 'offset', 'total_rows'])
+Row = collections.namedtuple('Row', ['id', 'key', 'value', 'doc'])
 
 class CouchDB2Exception(Exception):
     "Base CouchDB2 exception class."
@@ -83,7 +88,7 @@ class Server(object):
     def _get(self, *segments, **kwargs):
         "HTTP GET request to the CouchDB server."
         return self._session.get(self._href(segments),
-                                 **self._kwargs(kwargs, 'headers'))
+                                 **self._kwargs(kwargs, 'headers', 'params'))
 
     def _head(self, *segments):
         "HTTP HEAD request to the CouchDB server."
@@ -118,7 +123,7 @@ class Server(object):
 
     def get(self, name, create=True):
         """Get the named database.
-        If 'create' is True, then create it if it does not exist.
+        If 'create' is True, then create the database if it does not exist.
         """
         try:
             return Database(self, name)
@@ -298,7 +303,8 @@ class Database(object):
             current_doc = response.json()
             doc['_id'] = current_doc['_id']
             doc['_rev'] = current_doc['_rev']
-            if doc == current_doc: return False
+            if doc == current_doc: 
+                return False
         elif response.status_code == 401:
             raise AuthorizationError('read privilege required')
         elif response.status_code == 404:
@@ -323,6 +329,36 @@ class Database(object):
         else:
             raise IOError("{r.status_code} {r.reason}".format(r=response))
         return True
+
+    def view(self, designname, viewname, startkey=None, endkey=None,
+             descending=False, include_docs=False):
+        "Return rows from the named design view."
+        params = {}
+        if startkey is not None:
+            params['startkey'] = json.dumps(startkey)
+        if endkey is not None:
+            params['endkey'] = json.dumps(endkey)
+        if include_docs:
+            params['include_docs'] = 'true'
+        if descending:
+            params['descending'] = 'true'
+        response = self.server._get(self.name, '_design', designname, '_view',
+                                    viewname, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            print(json.dumps(data, indent=2))
+            return Rows([Row(r.get('id'), r.get('key'), r.get('value'),
+                             r.get('doc')) for r in data.get('rows', [])],
+                        data.get('offset'),
+                        data.get('total_rows'))
+        elif response.status_code == 400:
+            raise ValueError('invalid request body or parameters')
+        elif response.status_code == 401:
+            raise AuthorizationError('read privilege required')
+        elif response.status_code == 404:
+            raise NotFoundError('no such database, design or view')
+        else:
+            raise IOError("{r.status_code} {r.reason}".format(r=response))
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
         """'content' is a string or a file-like object.
@@ -376,3 +412,5 @@ if __name__ == '__main__':
                          {'views':
                           {'name':
                            {'map': "function (doc) {emit(doc.name, null);}"}}}))
+    result = db.view('all', 'name', include_docs=True)
+    print(json.dumps(result, indent=2))
