@@ -23,7 +23,8 @@ __version__ = '0.4.0'
 JSON_MIME = 'application/json'
 BIN_MIME  = 'application/octet-stream'
 
-Rows = collections.namedtuple('Rows', ['rows', 'offset', 'total_rows'])
+ViewResult = collections.namedtuple('ViewResult',
+                                    ['rows', 'offset', 'total_rows'])
 Row = collections.namedtuple('Row', ['id', 'key', 'value', 'doc'])
 
 class CouchDB2Exception(Exception):
@@ -31,6 +32,9 @@ class CouchDB2Exception(Exception):
 
 class NotFoundError(KeyError, CouchDB2Exception):
     "No such entity exists."
+
+class InvalidRequest(CouchDB2Exception):
+    "Invalid request; bad name, body or headers."
 
 class CreationError(CouchDB2Exception):
     "Could not create the entity; it exists already."
@@ -55,22 +59,19 @@ class Server(object):
         if self.username and self.password:
             self._session.auth = (self.username, self.password)
         self._session.headers.update({'Accept': JSON_MIME})
-        response = self._get()
-        if response.status_code != 200:
-            raise IOError('could not connect to the server')
-        self.version = response.json()['version']
+        self.version = self._GET().json()['version']
 
     def __str__(self):
         return "CouchDB {s.version} {s.href}".format(s=self)
 
     def __len__(self):
         "Number of user-defined databases."
-        data = self._get('_all_dbs').json()
+        data = self._GET('_all_dbs').json()
         return len([n for n in data if not n.startswith('_')])
 
     def __iter__(self):
         "Iterate over all user-defined databases on the server."
-        data = self._get('_all_dbs').json()
+        data = self._GET('_all_dbs').json()
         return iter([Database(self, n, check=False) 
                      for n in data if not n.startswith('_')])
 
@@ -78,34 +79,48 @@ class Server(object):
         """Get the named database.
         Raises NotFoundError if no such database.
         """
-        return Database(self, name)
+        return Database(self, name, check=True)
 
     def __contains__(self, name):
         "Does the named database exist?"
-        response = self._head(name)
+        response = self._HEAD(name)
         return response.status_code == 200
 
-    def _get(self, *segments, **kwargs):
-        "HTTP GET request to the CouchDB server."
-        return self._session.get(self._href(segments),
-                                 **self._kwargs(kwargs, 'headers', 'params'))
+    def get(self, name, check=True):
+        """Get the named database.
+        Raises NotFoundError if 'check' is True and the database does not exist.
+        """
+        return Database(self, name, check=check)
 
-    def _head(self, *segments):
+    def create(self, name):
+        """Create the named database.
+        Raises ValueError if the name is invalid.
+        Raises AuthorizationError if not server admin privileges.
+        Raises CreationError if a database with that name already exists.
+        Raises IOError if there is some other error.
+        """
+        return Database(self, name, check=False).create()
+
+    def _HEAD(self, *segments):
         "HTTP HEAD request to the CouchDB server."
         return self._session.head(self._href(segments))
 
-    def _put(self, *segments, **kwargs):
-        "HTTP PUT request to the CouchDB server."
-        return self._session.put(self._href(segments),
-                                 **self._kwargs(kwargs, 
-                                                'json', 'data', 'headers'))
+    def _GET(self, *segments, **kwargs):
+        "HTTP GET request to the CouchDB server."
+        kw = self._kwargs(kwargs, 'headers', 'params')
+        return self._session.get(self._href(segments), **kw)
 
-    def _delete(self, *segments, **kwargs):
+    def _PUT(self, *segments, **kwargs):
+        "HTTP PUT request to the CouchDB server."
+        kw = self._kwargs(kwargs, 'json', 'data', 'headers')
+        return self._session.put(self._href(segments), **kw)
+
+    def _DELETE(self, *segments, **kwargs):
         """HTTP DELETE request to the CouchDB server.
         Pass parameters in the keyword argument 'params'.
         """
-        return self._session.delete(self._href(segments),
-                                    **self._kwargs(kwargs, 'headers'))
+        kw = self._kwargs(kwargs, 'headers')
+        return self._session.delete(self._href(segments), **kw)
 
     def _href(self, segments):
         "Return the complete URL."
@@ -121,17 +136,29 @@ class Server(object):
                 pass
         return result
 
-    def get(self, name, create=True):
-        """Get the named database.
-        If 'create' is True, then create the database if it does not exist.
-        """
+    _default_errors = {
+        200: None,
+        201: None,
+        202: None,
+        304: None,
+        400: InvalidRequest('bad name, request body or parameters'),
+        401: AuthorizationError('insufficient privilege'),
+        404: NotFoundError('no such entity'),
+        409: RevisionError("missing or incorrect '_rev' item"),
+        412: CreationError('name already in use')}
+
+    def _check(self, response, errors={}):
+        "Raise an exception if the response status code indicates an error."
         try:
-            return Database(self, name)
-        except NotFoundError:
-            if create:
-                return Database(self, name, check=False).create()
-            else:
-                raise
+            error = errors[response.status_code]
+        except KeyError:
+            try:
+                error = self._default_errors[response.status_code]
+            except KeyError:
+                raise IOError("{r.status_code} {r.reason}".format(r=response))
+        if error is not None:
+            print(json.dumps(response.json()))
+            raise error
 
 
 class Database(object):
@@ -144,42 +171,34 @@ class Database(object):
             self.check()
 
     def __str__(self):
-        return "CouchDB database {s.name}".format(s=self)
+        return self.name
 
     def __len__(self):
         "Return the number of documents in the database."
-        response = self.server._get(self.name)
-        if response.status_code != 200:
-            raise ValueError("{r.status_code} {r.reason}".format(r=response))
-        return response.json()['doc_count']
+        return self.server._GET(self.name).json()['doc_count']
 
     def __contains__(self, id):
-        "Does a document with the given id exist in the database?"
-        response = self.server._head(self.name, id)
-        if response.status_code == 401:
-            raise AuthorizationError('read privilege required')
+        """Does a document with the given id exist in the database?
+        Raises AuthorizationError if not privileged to read.
+        Raises IOError if something else went wrong.
+        """
+        response = self.server._HEAD(self.name, id)
+        self.server._check(response, errors={404: None})
         return response.status_code in (200, 304)
 
     def __getitem__(self, id):
         """Return the document with the given id.
         Raises AuthorizationError if not privileged to read.
-        Raise NotFoundError if no such document or database.
+        Raises NotFoundError if no such document or database.
         Raises IOError if something else went wrong.
         """
-        response = self.server._get(self.name, id)
-        if response.status_code == 200:
-            return response.json()
-        elif response.status_code == 401:
-            raise AuthorizationError('read privilege required')
-        elif response.status_code == 404:
-            raise NotFoundError('no such document')
-        else:
-            raise IOError("{r.status_code} {r.reason}".format(r=response))
+        response = self.server._GET(self.name, id)
+        self.server._check(response)
+        return response.json()
 
     def exists(self):
         "Does this database exist?"
-        response = self.server._head(self.name)
-        return response.status_code == 200
+        return self.server._HEAD(self.name).status_code == 200
 
     def check(self):
         "Raises NotFoundError if this database does not exist."
@@ -193,17 +212,9 @@ class Database(object):
         Raises CreationError if a database with that name already exists.
         Raises IOError if there is some other error.
         """
-        response = self.server._put(self.name)
-        if response.status_code in (201, 202):
-            return self
-        elif response.status_code == 400:
-            raise ValueError("invalid database name {}".format(self.name))
-        elif response.status_code == 401:
-            raise AuthorizationError('server admin privileges required')
-        elif response.status_code == 412:
-            raise CreationError('database name already in use')
-        else:
-            raise IOError("{r.status_code} {r.reason}".format(r=response))
+        response = self.server._PUT(self.name)
+        self.server._check(response)
+        return self
 
     def destroy(self):
         """Delete this database and all its contents.
@@ -211,15 +222,8 @@ class Database(object):
         Raises NotFoundError if no such database.
         Raises IOError if there is some other error.
         """
-        response = self.server._delete(self.name)
-        if response.status_code in (200, 202):
-            pass
-        elif response.status_code == 401:
-            raise AuthorizationError('server admin privileges required')
-        elif response.status_code in (400, 404):
-            raise NotFoundError('no such database')
-        else:
-            raise IOError("{r.status_code} {r.reason}".format(r=response))
+        response = self.server._DELETE(self.name)
+        self.server._check(response)
 
     def get(self, id, default=None):
         """Return the document with the given id.
@@ -234,8 +238,8 @@ class Database(object):
 
     def save(self, doc):
         """Insert or update the document.
-        If the document does not contain an item '_id', it is added with
-        a UUID4 value. The '_rev' item is added or updated.
+        If the document does not contain an item '_id', it is added
+        having a UUID4 value. The '_rev' item is added or updated.
         Raises NotFoundError if the database does not exist.
         Raises AuthorizationError if not privileged to write.
         Raises RevisionError if the '_rev' item does not match.
@@ -243,22 +247,9 @@ class Database(object):
         """
         if '_id' not in doc:
             doc['_id'] = uuid.uuid4().hex
-        response = self.server._put(self.name, doc['_id'], json=doc)
-        if response.status_code in (201, 202):
-            data = response.json()
-            if not data.get('ok'):
-                raise IOError('response not OK')
-            doc['_rev'] = data['rev']
-        elif response.status_code == 400:
-            raise ValueError('invalid request body or parameters')
-        elif response.status_code == 401:
-            raise AuthorizationError('write privilege required')
-        elif response.status_code == 404:
-            raise NotFoundError('no such database')
-        elif response.status_code == 409:
-            raise RevisionError("missing or incorrect '_rev' item")
-        else:
-            raise IOError("{r.status_code} {r.reason}".format(r=response))
+        response = self.server._PUT(self.name, doc['_id'], json=doc)
+        self.server._check(response)
+        doc['_rev'] = response.json()['rev']
 
     def delete(self, doc):
         """Delete the document.
@@ -271,22 +262,9 @@ class Database(object):
             raise RevisionError("missing '_rev' item in the document")
         if '_id' not in doc:
             raise NotFoundError("missing '_id' item in the document")
-        response = self.server._delete(self.name, doc['_id'], 
+        response = self.server._DELETE(self.name, doc['_id'], 
                                        headers={'If-Match': doc['_rev']})
-        if response.status_code in (200, 202):
-            data = response.json()
-            if not data.get('ok'):
-                raise IOError('response not OK')
-        elif response.status_code == 400:
-            raise ValueError('invalid request body or parameters')
-        elif response.status_code == 401:
-            raise AuthorizationError('write privilege required')
-        elif response.status_code == 404:
-            raise NotFoundError('no such document')
-        elif response.status_code == 409:
-            raise RevisionError("missing or incorrect '_rev' item")
-        else:
-            raise IOError("{r.status_code} {r.reason}".format(r=response))
+        self.server._check(response)
 
     def load_design(self, name, doc):
         """Load the design document with the given name.
@@ -298,67 +276,51 @@ class Database(object):
         Raise NotFoundError if no such database.
         Raises IOError if something else went wrong.
         """
-        response = self.server._get(self.name, '_design', name)
+        response = self.server._GET(self.name, '_design', name)
+        self.server._check(response, {404: None})
         if response.status_code == 200:
             current_doc = response.json()
             doc['_id'] = current_doc['_id']
             doc['_rev'] = current_doc['_rev']
             if doc == current_doc: 
                 return False
-        elif response.status_code == 401:
-            raise AuthorizationError('read privilege required')
-        elif response.status_code == 404:
-            pass
-        else:
-            raise IOError("{r.status_code} {r.reason}".format(r=response))
-        response = self.server._put(self.name, '_design', name, json=doc)
-        if response.status_code in (201, 202):
-            data = response.json()
-            if not data.get('ok'):
-                raise IOError('response not OK')
-            doc['_id'] = data['id']
-            doc['_rev'] = data['rev']
-        elif response.status_code == 400:
-            raise ValueError('invalid request body or parameters')
-        elif response.status_code == 401:
-            raise AuthorizationError('write privilege required')
-        elif response.status_code == 404:
-            raise NotFoundError('no such database')
-        elif response.status_code == 409:
-            raise RevisionError("missing or incorrect '_rev' item")
-        else:
-            raise IOError("{r.status_code} {r.reason}".format(r=response))
+        response = self.server._PUT(self.name, '_design', name, json=doc)
+        self.server._check(response)
         return True
 
     def view(self, designname, viewname, startkey=None, endkey=None,
-             descending=False, include_docs=False):
+             skip=None, limit=None, descending=False,
+             group=False, group_level=None, reduce=None,
+             include_docs=False):
         "Return rows from the named design view."
         params = {}
         if startkey is not None:
             params['startkey'] = json.dumps(startkey)
         if endkey is not None:
             params['endkey'] = json.dumps(endkey)
-        if include_docs:
-            params['include_docs'] = 'true'
+        if skip is not None:
+            params['skip'] = str(skip)
+        if limit is not None:
+            params['limit'] = str(limit)
         if descending:
             params['descending'] = 'true'
-        response = self.server._get(self.name, '_design', designname, '_view',
+        if group:
+            params['group'] = 'true'
+        if group_level is not None:
+            params['group_level'] = str(group_level)
+        if reduce is not None:
+            params['reduce'] = str.dumps(bool(reduce))
+        if include_docs:
+            params['include_docs'] = 'true'
+        response = self.server._GET(self.name, '_design', designname, '_view',
                                     viewname, params=params)
-        if response.status_code == 200:
-            data = response.json()
-            print(json.dumps(data, indent=2))
-            return Rows([Row(r.get('id'), r.get('key'), r.get('value'),
-                             r.get('doc')) for r in data.get('rows', [])],
-                        data.get('offset'),
-                        data.get('total_rows'))
-        elif response.status_code == 400:
-            raise ValueError('invalid request body or parameters')
-        elif response.status_code == 401:
-            raise AuthorizationError('read privilege required')
-        elif response.status_code == 404:
-            raise NotFoundError('no such database, design or view')
-        else:
-            raise IOError("{r.status_code} {r.reason}".format(r=response))
+        self.server._check(response)
+        data = response.json()
+        print(json.dumps(data, indent=2))
+        return ViewResult([Row(r.get('id'), r.get('key'), r.get('value'),
+                               r.get('doc')) for r in data.get('rows', [])],
+                          data.get('offset'),
+                          data.get('total_rows'))
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
         """'content' is a string or a file-like object.
@@ -373,44 +335,38 @@ class Database(object):
         if not content_type:
             (content_type, enc) = mimetypes.guess_type(filename, strict=False)
             if not content_type: content_type = BIN_MIME
-        response = self.server._put(self.name, doc['_id'], filename,
+        response = self.server._PUT(self.name, doc['_id'], filename,
                                     data=content,
                                     headers={'Content-Type': content_type,
                                              'If-Match': doc['_rev']})
-        if response.status_code in (201, 202):
-            pass
-        elif response.status_code == 400:
-            raise ValueError('invalid request body or parameters')
-        elif response.status_code == 401:
-            raise AuthorizationError('write privilege required')
-        elif response.status_code == 404:
-            raise NotFoundError('no such document')
-        elif response.status_code == 409:
-            raise RevisionError("missing or incorrect '_rev' item")
-        else:
-            raise IOError("{r.status_code} {r.reason}".format(r=response))
+        self.server._check(response)
 
     def get_attachment(self, doc, filename):
         "Return a file-like object containing the content of the attachment."
-        response = self.server._get(self.name, doc['_id'], filename,
+        response = self.server._GET(self.name, doc['_id'], filename,
                                     headers={'If-Match': doc['_rev']})
-        if response.status_code == 200:
-            return ContentFile(response.content)
-        elif response.status_code == 401:
-            raise AuthorizationError('read privilege required')
-        elif response.status_code == 404:
-            raise NotFoundError('no such document or attachment')
-        else:
-            raise IOError("{r.status_code} {r.reason}".format(r=response))
+        self.server._check(response)
+        return ContentFile(response.content)
 
 
 if __name__ == '__main__':
-    db = Server().get('mytest')
-    doc = {'name': 'myfile3', 'contents': 'a Python file'}
+    server = Server()
+    try:
+        db = server.get('mytest')
+    except NotFoundError:
+        db = server.create('mytest')
+    print('stuff' in db)
+    try:
+        db['stuff']
+    except NotFoundError:
+        print('not found')
+    doc = {'id': 'stuff', 'name': 'blah'}
     db.save(doc)
+    print('stuff' in db)
     print(db.load_design('all', 
                          {'views':
                           {'name':
                            {'map': "function (doc) {emit(doc.name, null);}"}}}))
     result = db.view('all', 'name', include_docs=True)
     print(json.dumps(result, indent=2))
+    db.destroy()

@@ -23,7 +23,7 @@ def test_database():
     assert name not in server
     with pytest.raises(couchdb2.NotFoundError):
         db = server[name]
-    db = server.get(name)
+    db = server.create(name)
     assert name in server
     assert len(server) == count + 1
     with pytest.raises(couchdb2.CreationError):
@@ -36,7 +36,7 @@ def test_database():
     assert len(server) == count
 
 def test_document_create():
-    db = couchdb2.Server().get('mytest')
+    db = couchdb2.Server().create('mytest')
     assert len(db) == 0
     doc = {}
     docid = 'hardwired id'
@@ -60,7 +60,7 @@ def test_document_create():
     db.destroy()
 
 def test_document_update():
-    db = couchdb2.Server().get('mytest')
+    db = couchdb2.Server().create('mytest')
     assert len(db) == 0
     doc = {'name': 'Per', 'age': 59, 'mood': 'OK'}
     doc1 = doc.copy()
@@ -79,7 +79,7 @@ def test_document_update():
     db.destroy()
 
 def test_design_view():
-    db = couchdb2.Server().get('mytest')
+    db = couchdb2.Server().create('mytest')
     db.load_design('all',
                    {'views':
                     {'name':
@@ -104,7 +104,7 @@ def test_design_view():
     db.destroy()
 
 def test_document_attachments():
-    db = couchdb2.Server().get('mytest')
+    db = couchdb2.Server().create('mytest')
     id = 'mydoc'
     doc = {'_id': id, 'name': 'myfile', 'contents': 'a Python file'}
     db.save(doc)
