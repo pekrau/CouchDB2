@@ -18,7 +18,7 @@ import uuid
 
 import requests
 
-__version__ = '0.4.0'
+__version__ = '0.5.0'
 
 JSON_MIME = 'application/json'
 BIN_MIME  = 'application/octet-stream'
@@ -267,9 +267,9 @@ class Database(object):
         self.server._check(response)
 
     def load_design(self, name, doc):
-        """Load the design document with the given name.
-        If the existing design document is identical, no action and
-        False is returned, else True is returned.
+        """Load the design document under the given name.
+        If the existing design document is identical, no action is taken and
+        False is returned, else the document is updated and True is returned.
         See http://docs.couchdb.org/en/latest/api/ddoc/common.html for info
         on the structure of the ddoc.
         Raises AuthorizationError if not privileged to read.
@@ -288,35 +288,41 @@ class Database(object):
         self.server._check(response)
         return True
 
-    def view(self, designname, viewname, startkey=None, endkey=None,
-             skip=None, limit=None, descending=False,
+    def view(self, designname, viewname, key=None, keys=None,
+             startkey=None, endkey=None,
+             skip=None, limit=None, sorted=True, descending=False,
              group=False, group_level=None, reduce=None,
              include_docs=False):
         "Return rows from the named design view."
         params = {}
         if startkey is not None:
             params['startkey'] = json.dumps(startkey)
+        if key is not None:
+            params['key'] = json.dumps(key)
+        if keys is not None:
+            params['keys'] = json.dumps(keys)
         if endkey is not None:
             params['endkey'] = json.dumps(endkey)
         if skip is not None:
-            params['skip'] = str(skip)
+            params['skip'] = json.dumps(skip)
         if limit is not None:
-            params['limit'] = str(limit)
+            params['limit'] = json.dumps(limit)
+        if not sorted:
+            params['sorted'] = json.dumps(bool(sorted))
         if descending:
-            params['descending'] = 'true'
+            params['descending'] = json.dumps(bool(descending))
         if group:
-            params['group'] = 'true'
+            params['group'] = json.dumps(bool(group))
         if group_level is not None:
-            params['group_level'] = str(group_level)
+            params['group_level'] = json.dumps(group_level)
         if reduce is not None:
-            params['reduce'] = str.dumps(bool(reduce))
+            params['reduce'] = json.dumps(bool(reduce))
         if include_docs:
             params['include_docs'] = 'true'
         response = self.server._GET(self.name, '_design', designname, '_view',
                                     viewname, params=params)
         self.server._check(response)
         data = response.json()
-        print(json.dumps(data, indent=2))
         return ViewResult([Row(r.get('id'), r.get('key'), r.get('value'),
                                r.get('doc')) for r in data.get('rows', [])],
                           data.get('offset'),
