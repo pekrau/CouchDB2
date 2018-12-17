@@ -18,7 +18,7 @@ import uuid
 
 import requests
 
-__version__ = '0.7.0'
+__version__ = '0.8.0'
 
 JSON_MIME = 'application/json'
 BIN_MIME  = 'application/octet-stream'
@@ -87,7 +87,7 @@ class Server(object):
 
     def __contains__(self, name):
         "Does the named database exist?"
-        response = self._HEAD(name)
+        response = self._HEAD(name, errors={404: None})
         return response.status_code == 200
 
     def get(self, name, check=True):
@@ -105,31 +105,41 @@ class Server(object):
         """
         return Database(self, name, check=False).create()
 
-    def _HEAD(self, *segments):
+    def _HEAD(self, *segments, **kwargs):
         "HTTP HEAD request to the CouchDB server."
-        return self._session.head(self._href(segments))
+        response = self._session.head(self._href(segments))
+        self._check(response, errors=kwargs.get('errors', {}))
+        return response
 
     def _GET(self, *segments, **kwargs):
         "HTTP GET request to the CouchDB server."
         kw = self._kwargs(kwargs, 'headers', 'params')
-        return self._session.get(self._href(segments), **kw)
+        response = self._session.get(self._href(segments), **kw)
+        self._check(response, errors=kwargs.get('errors', {}))
+        return response
 
     def _PUT(self, *segments, **kwargs):
         "HTTP PUT request to the CouchDB server."
         kw = self._kwargs(kwargs, 'json', 'data', 'headers')
-        return self._session.put(self._href(segments), **kw)
+        response = self._session.put(self._href(segments), **kw)
+        self._check(response, errors=kwargs.get('errors', {}))
+        return response
 
     def _POST(self, *segments, **kwargs):
         "HTTP POST request to the CouchDB server."
         kw = self._kwargs(kwargs, 'json', 'data', 'headers', 'params')
-        return self._session.post(self._href(segments), **kw)
+        response = self._session.post(self._href(segments), **kw)
+        self._check(response, errors=kwargs.get('errors', {}))
+        return response
 
     def _DELETE(self, *segments, **kwargs):
         """HTTP DELETE request to the CouchDB server.
         Pass parameters in the keyword argument 'params'.
         """
         kw = self._kwargs(kwargs, 'headers')
-        return self._session.delete(self._href(segments), **kw)
+        response = self._session.delete(self._href(segments), **kw)
+        self._check(response, errors=kwargs.get('errors', {}))
+        return response
 
     def _href(self, segments):
         "Return the complete URL."
@@ -192,8 +202,7 @@ class Database(object):
         Raises AuthorizationError if not privileged to read.
         Raises IOError if something else went wrong.
         """
-        response = self.server._HEAD(self.name, id)
-        self.server._check(response, errors={404: None})
+        response = self.server._HEAD(self.name, id, errors={404: None})
         return response.status_code in (200, 304)
 
     def __getitem__(self, id):
@@ -203,12 +212,12 @@ class Database(object):
         Raises IOError if something else went wrong.
         """
         response = self.server._GET(self.name, id)
-        self.server._check(response)
         return response.json(object_pairs_hook=OD)
 
     def exists(self):
         "Does this database exist?"
-        return self.server._HEAD(self.name).status_code == 200
+        response = self.server._HEAD(self.name, errors={404: None})
+        return response.status_code == 200
 
     def check(self):
         "Raises NotFoundError if this database does not exist."
@@ -222,8 +231,7 @@ class Database(object):
         Raises CreationError if a database with that name already exists.
         Raises IOError if there is some other error.
         """
-        response = self.server._PUT(self.name)
-        self.server._check(response)
+        self.server._PUT(self.name)
         return self
 
     def destroy(self):
@@ -232,18 +240,15 @@ class Database(object):
         Raises NotFoundError if no such database.
         Raises IOError if there is some other error.
         """
-        response = self.server._DELETE(self.name)
-        self.server._check(response)
+        self.server._DELETE(self.name)
 
     def compact(self):
         "Compact the database on disk. May take some time."
-        response = self.server._POST(self.name, '_compact')
-        self.server._check(response)
+        self.server._POST(self.name, '_compact')
 
     def is_compact_running(self):
         "Is a compact operation running?"
         response = self.server._GET(self.name)
-        self.server._check(response)
         return response.json()['compact_running']
 
     def get(self, id, default=None):
@@ -269,7 +274,6 @@ class Database(object):
             else:
                 docs.append({'id': id})
         response = self.server._POST(self.name, '_bulk_get', json={'docs':docs})
-        self.server._check(response)
         result = []
         for item in response.json(object_pairs_hook=OD)['results']:
             for doc in item.get('docs', []):
@@ -291,7 +295,6 @@ class Database(object):
         if '_id' not in doc:
             doc['_id'] = uuid.uuid4().hex
         response = self.server._PUT(self.name, doc['_id'], json=doc)
-        self.server._check(response)
         doc['_rev'] = response.json()['rev']
 
     def delete(self, doc):
@@ -307,7 +310,6 @@ class Database(object):
             raise NotFoundError("missing '_id' item in the document")
         response = self.server._DELETE(self.name, doc['_id'], 
                                        headers={'If-Match': doc['_rev']})
-        self.server._check(response)
 
     def load_design(self, name, doc, rebuild=True):
         """Load the design document under the given name.
@@ -330,8 +332,8 @@ class Database(object):
         Raise NotFoundError if no such database.
         Raises IOError if something else went wrong.
         """
-        response = self.server._GET(self.name, '_design', name)
-        self.server._check(response, {404: None})
+        response = self.server._GET(self.name, '_design', name,
+                                    errors={404: None})
         if response.status_code == 200:
             current_doc = response.json()
             doc['_id'] = current_doc['_id']
@@ -339,7 +341,6 @@ class Database(object):
             if doc == current_doc: 
                 return False
         response = self.server._PUT(self.name, '_design', name, json=doc)
-        self.server._check(response)
         if rebuild:
             for view in doc.get('views', {}):
                 self.view(name, view, limit=1)
@@ -378,7 +379,6 @@ class Database(object):
             params['include_docs'] = 'true'
         response = self.server._GET(self.name, '_design', designname, '_view',
                                     viewname, params=params)
-        self.server._check(response)
         data = response.json()
         return ViewResult([Row(r.get('id'), r.get('key'), r.get('value'),
                                r.get('doc')) for r in data.get('rows', [])],
@@ -405,7 +405,6 @@ class Database(object):
         if selector is not None:
             data['index']['partial_filter_selector'] = selector
         response = self.server._POST(self.name, '_index', json=data)
-        self.server._check(response)
         return response.json()
 
     def find(self, selector, limit=None, skip=None, sort=None, fields=None,
@@ -433,7 +432,6 @@ class Database(object):
         if update is not None:
             data['update'] = update
         response = self.server._POST(self.name, '_find', json=data)
-        self.server._check(response)
         return response.json(object_pairs_hook=OD)
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
@@ -453,13 +451,11 @@ class Database(object):
                                     data=content,
                                     headers={'Content-Type': content_type,
                                              'If-Match': doc['_rev']})
-        self.server._check(response)
 
     def get_attachment(self, doc, filename):
         "Return a file-like object containing the content of the attachment."
         response = self.server._GET(self.name, doc['_id'], filename,
                                     headers={'If-Match': doc['_rev']})
-        self.server._check(response)
         return ContentFile(response.content)
 
 

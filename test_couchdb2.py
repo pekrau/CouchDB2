@@ -60,7 +60,8 @@ def test_document_create():
     db.destroy()
 
 def test_document_update():
-    db = couchdb2.Server().create('mytest')
+    server = couchdb2.Server()
+    db = server.create('mytest')
     assert len(db) == 0
     doc = {'name': 'Per', 'age': 59, 'mood': 'jolly'}
     doc1 = doc.copy()
@@ -78,9 +79,10 @@ def test_document_update():
     id3 = doc3['_id']
     assert len(db) == 2
     assert docid != doc3['_id']
-    docs = db.get_docs(id1, id3, 'dummy')
-    assert len(docs) == 2
-    assert set([d['_id'] for d in docs]) == set([id1, id3])
+    if server.version.startswith('2'):
+        docs = db.get_docs(id1, id3, 'dummy')
+        assert len(docs) == 2
+        assert set([d['_id'] for d in docs]) == set([id1, id3])
     db.destroy()
 
 def test_design_view():
@@ -124,7 +126,9 @@ def test_design_view():
     db.destroy()
 
 def test_index():
-    db = couchdb2.Server().create('mytest')
+    server = couchdb2.Server()
+    if not server.version.startswith('2'): return
+    db = server.create('mytest')
     db.save({'name': 'Per', 'type': 'person', 'content': 'stuff'})
     db.save({'name': 'Anders', 'type': 'person', 'content': 'other stuff'})
     db.save({'name': 'Per', 'type': 'computer', 'content': 'data'})
