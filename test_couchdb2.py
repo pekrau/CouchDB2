@@ -62,9 +62,10 @@ def test_document_create():
 def test_document_update():
     db = couchdb2.Server().create('mytest')
     assert len(db) == 0
-    doc = {'name': 'Per', 'age': 59, 'mood': 'OK'}
+    doc = {'name': 'Per', 'age': 59, 'mood': 'jolly'}
     doc1 = doc.copy()
     db.save(doc1)
+    id1 = doc1['_id']
     assert len(db) == 1
     docid = doc1.get('_id')
     assert docid
@@ -74,8 +75,12 @@ def test_document_update():
     assert doc2['mood'] == 'excellent'
     doc3 = doc.copy()
     db.save(doc3)
+    id3 = doc3['_id']
     assert len(db) == 2
     assert docid != doc3['_id']
+    docs = db.get_docs(id1, id3, 'dummy')
+    assert len(docs) == 2
+    assert set([d['_id'] for d in docs]) == set([id1, id3])
     db.destroy()
 
 def test_design_view():

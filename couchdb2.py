@@ -18,7 +18,7 @@ import uuid
 
 import requests
 
-__version__ = '0.6.0'
+__version__ = '0.7.0'
 
 JSON_MIME = 'application/json'
 BIN_MIME  = 'application/octet-stream'
@@ -26,6 +26,7 @@ BIN_MIME  = 'application/octet-stream'
 ViewResult = collections.namedtuple('ViewResult',
                                     ['rows', 'offset', 'total_rows'])
 Row = collections.namedtuple('Row', ['id', 'key', 'value', 'doc'])
+OD = collections.OrderedDict
 
 class CouchDB2Exception(Exception):
     "Base CouchDB2 exception class."
@@ -120,7 +121,7 @@ class Server(object):
 
     def _POST(self, *segments, **kwargs):
         "HTTP POST request to the CouchDB server."
-        kw = self._kwargs(kwargs, 'json', 'data', 'headers')
+        kw = self._kwargs(kwargs, 'json', 'data', 'headers', 'params')
         return self._session.post(self._href(segments), **kw)
 
     def _DELETE(self, *segments, **kwargs):
@@ -203,7 +204,7 @@ class Database(object):
         """
         response = self.server._GET(self.name, id)
         self.server._check(response)
-        return response.json()
+        return response.json(object_pairs_hook=OD)
 
     def exists(self):
         "Does this database exist?"
@@ -255,6 +256,28 @@ class Database(object):
             return self[id]
         except NotFoundError:
             return default
+
+    def get_docs(self, *ids):
+        """Return the documents for the given ids.
+        Nothing is returned for an item in the input list that does
+        not match any document.
+        """
+        docs = []
+        for id in ids:
+            if isinstance(id, dict):
+                docs.append(id)
+            else:
+                docs.append({'id': id})
+        response = self.server._POST(self.name, '_bulk_get', json={'docs':docs})
+        self.server._check(response)
+        result = []
+        for item in response.json(object_pairs_hook=OD)['results']:
+            for doc in item.get('docs', []):
+                try:
+                    result.append(doc['ok'])
+                except KeyError:
+                    pass
+        return result
 
     def save(self, doc):
         """Insert or update the document.
@@ -411,7 +434,7 @@ class Database(object):
             data['update'] = update
         response = self.server._POST(self.name, '_find', json=data)
         self.server._check(response)
-        return response.json()
+        return response.json(object_pairs_hook=OD)
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
         """'content' is a string or a file-like object.
@@ -448,16 +471,17 @@ if __name__ == '__main__':
         db = server.create('mytest')
     doc = {'type': 'adoc', 'name': 'blah'}
     db.save(doc)
+    rev = doc['_rev']
+    doc['other'] = 'stuff'
+    db.save(doc)
+    id1 = {'id': doc['_id'], 'rev': rev}
+    id1x = {'id': doc['_id'], 'rev': doc['_rev']}
     doc = {'type': 'adoc', 'name': 'blopp'}
     db.save(doc)
+    id2 = doc['_id']
     doc = {'type': 'bdoc', 'name': 'blonk'}
     db.save(doc)
-    result = db.load_index(['name'], selector={'type': 'adoc'})
-    nameindex = result['name']
-    result = db.load_index(['type'])
-    typeindex = result['name']
-    result = db.find({'name': 'blah'}, use_index=nameindex)
-    print(json.dumps(result, indent=2))
-    result = db.find({'type': 'adoc'}, use_index=typeindex)
+    id3 = doc['_id']
+    result = db.get_docs(id1, id1x, id2, 'dummy')
     print(json.dumps(result, indent=2))
     db.destroy()
