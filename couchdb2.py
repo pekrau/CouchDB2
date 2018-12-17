@@ -18,7 +18,7 @@ import uuid
 
 import requests
 
-__version__ = '0.5.0'
+__version__ = '0.6.0'
 
 JSON_MIME = 'application/json'
 BIN_MIME  = 'application/octet-stream'
@@ -145,7 +145,8 @@ class Server(object):
         401: AuthorizationError('insufficient privilege'),
         404: NotFoundError('no such entity'),
         409: RevisionError("missing or incorrect '_rev' item"),
-        412: CreationError('name already in use')}
+        412: CreationError('name already in use'),
+        415: TypeError('bad Content-Type value')}
 
     def _check(self, response, errors={}):
         "Raise an exception if the response status code indicates an error."
@@ -157,7 +158,6 @@ class Server(object):
             except KeyError:
                 raise IOError("{r.status_code} {r.reason}".format(r=response))
         if error is not None:
-            print(json.dumps(response.json()))
             raise error
 
 
@@ -225,6 +225,17 @@ class Database(object):
         response = self.server._DELETE(self.name)
         self.server._check(response)
 
+    def compact(self):
+        "Compact the database on disk. May take some time."
+        response = self.server._POST(self.name, '_compact')
+        self.server._check(response)
+
+    def is_compact_running(self):
+        "Is a compact operation running?"
+        response = self.server._GET(self.name)
+        self.server._check(response)
+        return response.json()['compact_running']
+
     def get(self, id, default=None):
         """Return the document with the given id.
         Returns the default if not found.
@@ -266,12 +277,23 @@ class Database(object):
                                        headers={'If-Match': doc['_rev']})
         self.server._check(response)
 
-    def load_design(self, name, doc):
+    def load_design(self, name, doc, rebuild=True):
         """Load the design document under the given name.
         If the existing design document is identical, no action is taken and
         False is returned, else the document is updated and True is returned.
-        See http://docs.couchdb.org/en/latest/api/ddoc/common.html for info
-        on the structure of the ddoc.
+        If 'rebuild' is True, the force indexes to be rebuilt after update.
+        Example of doc:
+          {'views':
+            {'name':
+              {'map': "function (doc) {emit(doc.name, null);}"},
+             'name_sum':
+              {'map': "function (doc) {emit(doc.name, 1);}",
+               'reduce': '_sum'},
+             'name_count':
+              {'map': "function (doc) {emit(doc.name, null);}",
+               'reduce': '_count'}
+          }}
+        More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
         Raises AuthorizationError if not privileged to read.
         Raise NotFoundError if no such database.
         Raises IOError if something else went wrong.
@@ -286,6 +308,9 @@ class Database(object):
                 return False
         response = self.server._PUT(self.name, '_design', name, json=doc)
         self.server._check(response)
+        if rebuild:
+            for view in doc.get('views', {}):
+                self.view(name, view, limit=1)
         return True
 
     def view(self, designname, viewname, key=None, keys=None,
