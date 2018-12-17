@@ -33,7 +33,7 @@ class CouchDB2Exception(Exception):
 class NotFoundError(KeyError, CouchDB2Exception):
     "No such entity exists."
 
-class InvalidRequest(CouchDB2Exception):
+class BadRequest(CouchDB2Exception):
     "Invalid request; bad name, body or headers."
 
 class CreationError(CouchDB2Exception):
@@ -44,6 +44,9 @@ class RevisionError(CouchDB2Exception):
 
 class AuthorizationError(CouchDB2Exception):
     "Current user not authorized to perform the operation."
+
+class ServerError(CouchDB2Exception):
+    "Internal server error."
 
 
 class Server(object):
@@ -115,6 +118,11 @@ class Server(object):
         kw = self._kwargs(kwargs, 'json', 'data', 'headers')
         return self._session.put(self._href(segments), **kw)
 
+    def _POST(self, *segments, **kwargs):
+        "HTTP POST request to the CouchDB server."
+        kw = self._kwargs(kwargs, 'json', 'data', 'headers')
+        return self._session.post(self._href(segments), **kw)
+
     def _DELETE(self, *segments, **kwargs):
         """HTTP DELETE request to the CouchDB server.
         Pass parameters in the keyword argument 'params'.
@@ -141,12 +149,13 @@ class Server(object):
         201: None,
         202: None,
         304: None,
-        400: InvalidRequest('bad name, request body or parameters'),
+        400: BadRequest('bad name, request body or parameters'),
         401: AuthorizationError('insufficient privilege'),
         404: NotFoundError('no such entity'),
         409: RevisionError("missing or incorrect '_rev' item"),
         412: CreationError('name already in use'),
-        415: TypeError('bad Content-Type value')}
+        415: TypeError("bad 'Content-Type' value"),
+        500: ServerError('internal server error')}
 
     def _check(self, response, errors={}):
         "Raise an exception if the response status code indicates an error."
@@ -281,7 +290,7 @@ class Database(object):
         """Load the design document under the given name.
         If the existing design document is identical, no action is taken and
         False is returned, else the document is updated and True is returned.
-        If 'rebuild' is True, the force indexes to be rebuilt after update.
+        If 'rebuild' is True, force view indexes to be rebuilt after update.
         Example of doc:
           {'views':
             {'name':
@@ -353,6 +362,57 @@ class Database(object):
                           data.get('offset'),
                           data.get('total_rows'))
 
+    def load_index(self, fields, id=None, name=None, selector=None):
+        """Load a Mango index specification.
+        'fields' is a list of fields to index.
+        'id' is the design document name.
+        'name' is the view name.
+        'selector' is a partial filter selector.
+        Returns a dictionary with items 'id' (design document name),
+        'name' (index name) and 'result' ('created' or 'exists').
+        Raises BadRequest if the index is malformed.
+        Raises AuthorizationError if not server admin privileges.
+        Raises ServerError if there is an internal server error.
+        """
+        data = {'index': {'fields': fields}}
+        if id is not None:
+            data['ddoc'] = id
+        if name is not None:
+            data['name'] = name
+        if selector is not None:
+            data['index']['partial_filter_selector'] = selector
+        response = self.server._POST(self.name, '_index', json=data)
+        self.server._check(response)
+        return response.json()
+
+    def find(self, selector, limit=None, skip=None, sort=None, fields=None,
+             use_index=None, bookmark=None, update=None):
+        """Select documents according to the selector.
+        Returns a dictionary with items 'docs', 'warning', 'execution_stats'
+        and 'bookmark'.
+        Raises BadRequest if the selector is malformed.
+        Raises AuthorizationError if not privileged to read.
+        Raises ServerError if there is an internal server error.
+        """
+        data = {'selector': selector}
+        if limit is not None:
+            data['limit'] = limit
+        if skip is not None:
+            data['skip'] = skip
+        if sort is not None:
+            data['sort'] = sort
+        if fields is not None:
+            data['fields'] = fields
+        if use_index is not None:
+            data['use_index'] = use_index
+        if bookmark is not None:
+            data['bookmark'] = bookmark
+        if update is not None:
+            data['update'] = update
+        response = self.server._POST(self.name, '_find', json=data)
+        self.server._check(response)
+        return response.json()
+
     def put_attachment(self, doc, content, filename=None, content_type=None):
         """'content' is a string or a file-like object.
         If no filename, then an attempt is made to get it from content object.
@@ -386,18 +446,18 @@ if __name__ == '__main__':
         db = server.get('mytest')
     except NotFoundError:
         db = server.create('mytest')
-    print('stuff' in db)
-    try:
-        db['stuff']
-    except NotFoundError:
-        print('not found')
-    doc = {'id': 'stuff', 'name': 'blah'}
+    doc = {'type': 'adoc', 'name': 'blah'}
     db.save(doc)
-    print('stuff' in db)
-    print(db.load_design('all', 
-                         {'views':
-                          {'name':
-                           {'map': "function (doc) {emit(doc.name, null);}"}}}))
-    result = db.view('all', 'name', include_docs=True)
+    doc = {'type': 'adoc', 'name': 'blopp'}
+    db.save(doc)
+    doc = {'type': 'bdoc', 'name': 'blonk'}
+    db.save(doc)
+    result = db.load_index(['name'], selector={'type': 'adoc'})
+    nameindex = result['name']
+    result = db.load_index(['type'])
+    typeindex = result['name']
+    result = db.find({'name': 'blah'}, use_index=nameindex)
+    print(json.dumps(result, indent=2))
+    result = db.find({'type': 'adoc'}, use_index=typeindex)
     print(json.dumps(result, indent=2))
     db.destroy()

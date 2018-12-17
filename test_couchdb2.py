@@ -118,6 +118,32 @@ def test_design_view():
     assert result.rows[0].value == 2
     db.destroy()
 
+def test_index():
+    db = couchdb2.Server().create('mytest')
+    db.save({'name': 'Per', 'type': 'person', 'content': 'stuff'})
+    db.save({'name': 'Anders', 'type': 'person', 'content': 'other stuff'})
+    db.save({'name': 'Per', 'type': 'computer', 'content': 'data'})
+    result = db.find({'type': 'person'})
+    assert len(result['docs']) == 2
+    assert result.get('warning')
+    result = db.find({'type': 'computer'})
+    assert len(result['docs']) == 1
+    result = db.find({'type': 'house'})
+    assert len(result['docs']) == 0
+    result = db.load_index(['name'], selector={'type': 'person'})
+    personnameindex = result['name']
+    result = db.find({'name': 'Per'})
+    assert result.get('warning')
+    assert len(result['docs']) == 2
+    result = db.find({'name': 'Per', 'type': 'person'},
+                     use_index=personnameindex)
+    assert len(result['docs']) == 1
+    # Same as above, implicitly
+    result = db.find({'name': 'Per'}, use_index=personnameindex)
+    assert len(result['docs']) == 1
+    assert not result.get('warning')
+    db.destroy()
+
 def test_document_attachments():
     db = couchdb2.Server().create('mytest')
     id = 'mydoc'
