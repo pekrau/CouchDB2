@@ -18,32 +18,32 @@ Get the named database.
 
 ### \_\_str\_\_
 ```python
-Server.\_\_str\_\_(self)
+Server.__str__(self)
 ```
 Return a simple string representation of the server interface.
 
 ### \_\_len\_\_
 ```python
-Server.\_\_len\_\_(self)
+Server.__len__(self)
 ```
 Return the number of user-defined databases.
 
 ### \_\_iter\_\_
 ```python
-Server.\_\_iter\_\_(self)
+Server.__iter__(self)
 ```
 Return an iterator over all user-defined databases on the server.
 
 ### \_\_getitem\_\_
 ```python
-Server.\_\_getitem\_\_(self, name)
+Server.__getitem__(self, name)
 ```
 Get the named database.
 - Raises NotFoundError if no such database.
 
 ### \_\_contains\_\_
 ```python
-Server.\_\_contains\_\_(self, name)
+Server.__contains__(self, name)
 ```
 Does the named database exist?
 
@@ -65,19 +65,19 @@ Interface to a named CouchDB database.
 
 ### \_\_str\_\_
 ```python
-Server.\_\_str\_\_(self)
+Server.__str__(self)
 ```
 Return the name of the CouchDB database.
 
 ### \_\_len\_\_
 ```python
-Server.\_\_len\_\_(self)
+Server.__len__(self)
 ```
 Return the number of documents in the database.
 
-### \_\_contains\_\_
+### __contains__
 ```python
-Server.\_\_contains\_\_(self, id)
+Server.__contains__(self, id)
 ```
 Does a document with the given id exist in the database?
 - Raises AuthorizationError if not privileged to read.
@@ -85,7 +85,7 @@ Does a document with the given id exist in the database?
 
 ### \_\_getitem\_\_
 ```python
-Server.\_\_getitem\_\_(self, id)
+Server.__getitem__(self, id)
 ```
 Return the document with the given id.
 - Raises AuthorizationError if not privileged to read.
