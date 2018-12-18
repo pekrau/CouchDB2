@@ -7,6 +7,7 @@ Relies on requests, http://docs.python-requests.org/en/master/
 from __future__ import print_function, unicode_literals
 
 import collections
+from collections import OrderedDict as OD
 import json
 import mimetypes
 try:                            # Python 2
@@ -23,35 +24,6 @@ __version__ = '0.9.0'
 
 JSON_MIME = 'application/json'
 BIN_MIME  = 'application/octet-stream'
-
-ViewResult = collections.namedtuple('ViewResult',
-                                    ['rows', 'offset', 'total_rows'])
-Row = collections.namedtuple('Row', ['id', 'key', 'value', 'doc'])
-OD = collections.OrderedDict
-
-class CouchDB2Exception(Exception):
-    "Base CouchDB2 exception."
-
-class NotFoundError(CouchDB2Exception):
-    "No such entity exists."
-
-class BadRequestError(CouchDB2Exception):
-    "Invalid request; bad name, body or headers."
-
-class CreationError(CouchDB2Exception):
-    "Could not create the entity; it exists already."
-
-class RevisionError(CouchDB2Exception):
-    "Wrong or missing '_rev' item in the document to save."
-
-class AuthorizationError(CouchDB2Exception):
-    "Current user not authorized to perform the operation."
-
-class ContentTypeError(CouchDB2Exception):
-    "Bad 'Content-Type' value in the request."
-
-class ServerError(CouchDB2Exception):
-    "Internal server error."
 
 
 class Server(object):
@@ -85,7 +57,7 @@ class Server(object):
 
     def __getitem__(self, name):
         """Get the named database.
-        Raises NotFoundError if no such database.
+        - Raises NotFoundError if no such database.
         """
         return Database(self, name, check=True)
 
@@ -96,16 +68,16 @@ class Server(object):
 
     def get(self, name, check=True):
         """Get the named database.
-        Raises NotFoundError if 'check' is True and the database does not exist.
+        - Raises NotFoundError if 'check' is True and no database exists.
         """
         return Database(self, name, check=check)
 
     def create(self, name):
         """Create the named database.
-        Raises BadRequestError if the name is invalid.
-        Raises AuthorizationError if not server admin privileges.
-        Raises CreationError if a database with that name already exists.
-        Raises IOError if there is some other error.
+        - Raises BadRequestError if the name is invalid.
+        - Raises AuthorizationError if not server admin privileges.
+        - Raises CreationError if a database with that name already exists.
+        - Raises IOError if there is some other error.
         """
         return Database(self, name, check=False).create()
 
@@ -159,26 +131,13 @@ class Server(object):
                 pass
         return result
 
-    _default_errors = {
-        200: None,
-        201: None,
-        202: None,
-        304: None,
-        400: BadRequestError('bad name, request body or parameters'),
-        401: AuthorizationError('insufficient privilege'),
-        404: NotFoundError('no such entity'),
-        409: RevisionError("missing or incorrect '_rev' item"),
-        412: CreationError('name already in use'),
-        415: ContentTypeError("bad 'Content-Type' value"),
-        500: ServerError('internal server error')}
-
     def _check(self, response, errors={}):
         "Raise an exception if the response status code indicates an error."
         try:
             error = errors[response.status_code]
         except KeyError:
             try:
-                error = self._default_errors[response.status_code]
+                error = _ERRORS[response.status_code]
             except KeyError:
                 raise IOError("{r.status_code} {r.reason}".format(r=response))
         if error is not None:
@@ -203,17 +162,17 @@ class Database(object):
 
     def __contains__(self, id):
         """Does a document with the given id exist in the database?
-        Raises AuthorizationError if not privileged to read.
-        Raises IOError if something else went wrong.
+        - Raises AuthorizationError if not privileged to read.
+        - Raises IOError if something else went wrong.
         """
         response = self.server._HEAD(self.name, id, errors={404: None})
         return response.status_code in (200, 304)
 
     def __getitem__(self, id):
         """Return the document with the given id.
-        Raises AuthorizationError if not privileged to read.
-        Raises NotFoundError if no such document or database.
-        Raises IOError if something else went wrong.
+        - Raises AuthorizationError if not privileged to read.
+        - Raises NotFoundError if no such document or database.
+        - Raises IOError if something else went wrong.
         """
         result = self.get(id)
         if result is None:
@@ -227,25 +186,25 @@ class Database(object):
         return response.status_code == 200
 
     def check(self):
-        "Raises NotFoundError if this database does not exist."
+        "- Raises NotFoundError if this database does not exist."
         if not self.exists():
             raise NotFoundError('database does not exist')
 
     def create(self):
         """Create this database.
-        Raises BadRequestError if the name is invalid.
-        Raises AuthorizationError if not server admin privileges.
-        Raises CreationError if a database with that name already exists.
-        Raises IOError if there is some other error.
+        - Raises BadRequestError if the name is invalid.
+        - Raises AuthorizationError if not server admin privileges.
+        - Raises CreationError if a database with that name already exists.
+        - Raises IOError if there is some other error.
         """
         self.server._PUT(self.name)
         return self
 
     def destroy(self):
         """Delete this database and all its contents.
-        Raises AuthorizationError if not server admin privileges.
-        Raises NotFoundError if no such database.
-        Raises IOError if there is some other error.
+        - Raises AuthorizationError if not server admin privileges.
+        - Raises NotFoundError if no such database.
+        - Raises IOError if there is some other error.
         """
         self.server._DELETE(self.name)
 
@@ -261,9 +220,9 @@ class Database(object):
 
     def get(self, id, rev=None, revs_info=False, default=None):
         """Return the document with the given id.
-        Returns the default if not found.
-        Raises AuthorizationError if not read privilege.
-        Raises IOError if there is some other error.
+        - Returns the default if not found.
+        - Raises AuthorizationError if not read privilege.
+        - Raises IOError if there is some other error.
         """
         params = {}
         if rev is not None:
@@ -278,12 +237,14 @@ class Database(object):
 
     def save(self, doc):
         """Insert or update the document.
+
         If the document does not contain an item '_id', it is added
         having a UUID4 value. The '_rev' item is added or updated.
-        Raises NotFoundError if the database does not exist.
-        Raises AuthorizationError if not privileged to write.
-        Raises RevisionError if the '_rev' item does not match.
-        Raises IOError if something else went wrong.
+
+        - Raises NotFoundError if the database does not exist.
+        - Raises AuthorizationError if not privileged to write.
+        - Raises RevisionError if the '_rev' item does not match.
+        - Raises IOError if something else went wrong.
         """
         if '_id' not in doc:
             doc['_id'] = uuid.uuid4().hex
@@ -292,10 +253,10 @@ class Database(object):
 
     def delete(self, doc):
         """Delete the document.
-        Raises NotFoundError if no such document or no '_id' item.
-        Raises RevisionError if no '_rev' item, or it does not match.
-        Raises ValueError if the request body or parameters are invalid.
-        Raises IOError if something else went wrong.
+        - Raises NotFoundError if no such document or no '_id' item.
+        - Raises RevisionError if no '_rev' item, or it does not match.
+        - Raises ValueError if the request body or parameters are invalid.
+        - Raises IOError if something else went wrong.
         """
         if '_rev' not in doc:
             raise RevisionError("missing '_rev' item in the document")
@@ -306,10 +267,14 @@ class Database(object):
 
     def load_design(self, name, doc, rebuild=True):
         """Load the design document under the given name.
+
         If the existing design document is identical, no action is taken and
         False is returned, else the document is updated and True is returned.
+
         If 'rebuild' is True, force view indexes to be rebuilt after update.
+
         Example of doc:
+        ```
           {'views':
             {'name':
               {'map': "function (doc) {emit(doc.name, null);}"},
@@ -320,10 +285,13 @@ class Database(object):
               {'map': "function (doc) {emit(doc.name, null);}",
                'reduce': '_count'}
           }}
+        ```
+
         More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
-        Raises AuthorizationError if not privileged to read.
-        Raise NotFoundError if no such database.
-        Raises IOError if something else went wrong.
+
+        - Raises AuthorizationError if not privileged to read.
+        - Raise NotFoundError if no such database.
+        - Raises IOError if something else went wrong.
         """
         response = self.server._GET(self.name, '_design', name,
                                     errors={404: None})
@@ -344,7 +312,7 @@ class Database(object):
              skip=None, limit=None, sorted=True, descending=False,
              group=False, group_level=None, reduce=None,
              include_docs=False):
-        "Return rows from the named design view."
+        "Return the selected rows from the named design view."
         params = {}
         if startkey is not None:
             params['startkey'] = json.dumps(startkey)
@@ -380,15 +348,18 @@ class Database(object):
 
     def load_index(self, fields, id=None, name=None, selector=None):
         """Load a Mango index specification.
-        'fields' is a list of fields to index.
-        'id' is the design document name.
-        'name' is the view name.
-        'selector' is a partial filter selector.
+
+        - 'fields' is a list of fields to index.
+        - 'id' is the design document name.
+        - 'name' is the view name.
+        - 'selector' is a partial filter selector.
+
         Returns a dictionary with items 'id' (design document name),
         'name' (index name) and 'result' ('created' or 'exists').
-        Raises BadRequestError if the index is malformed.
-        Raises AuthorizationError if not server admin privileges.
-        Raises ServerError if there is an internal server error.
+
+        - Raises BadRequestError if the index is malformed.
+        - Raises AuthorizationError if not server admin privileges.
+        - Raises ServerError if there is an internal server error.
         """
         data = {'index': {'fields': fields}}
         if id is not None:
@@ -403,11 +374,13 @@ class Database(object):
     def find(self, selector, limit=None, skip=None, sort=None, fields=None,
              use_index=None, bookmark=None, update=None):
         """Select documents according to the selector.
+
         Returns a dictionary with items 'docs', 'warning', 'execution_stats'
         and 'bookmark'.
-        Raises BadRequestError if the selector is malformed.
-        Raises AuthorizationError if not privileged to read.
-        Raises ServerError if there is an internal server error.
+
+        - Raises BadRequestError if the selector is malformed.
+        - Raises AuthorizationError if not privileged to read.
+        - Raises ServerError if there is an internal server error.
         """
         data = {'selector': selector}
         if limit is not None:
@@ -429,8 +402,10 @@ class Database(object):
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
         """'content' is a string or a file-like object.
+
         If no filename, then an attempt is made to get it from content object.
-        Raises ValueError if no filename is available.
+
+        - Raises ValueError if no filename is available.
         """
         if filename is None:
             try:
@@ -450,6 +425,48 @@ class Database(object):
         response = self.server._GET(self.name, doc['_id'], filename,
                                     headers={'If-Match': doc['_rev']})
         return ContentFile(response.content)
+
+
+ViewResult = collections.namedtuple('ViewResult',
+                                    ['rows', 'offset', 'total_rows'])
+Row = collections.namedtuple('Row', ['id', 'key', 'value', 'doc'])
+
+class CouchDB2Exception(Exception):
+    "Base CouchDB2 exception."
+
+class NotFoundError(CouchDB2Exception):
+    "No such entity exists."
+
+class BadRequestError(CouchDB2Exception):
+    "Invalid request; bad name, body or headers."
+
+class CreationError(CouchDB2Exception):
+    "Could not create the entity; it exists already."
+
+class RevisionError(CouchDB2Exception):
+    "Wrong or missing '_rev' item in the document to save."
+
+class AuthorizationError(CouchDB2Exception):
+    "Current user not authorized to perform the operation."
+
+class ContentTypeError(CouchDB2Exception):
+    "Bad 'Content-Type' value in the request."
+
+class ServerError(CouchDB2Exception):
+    "Internal server error."
+
+_ERRORS = {
+    200: None,
+    201: None,
+    202: None,
+    304: None,
+    400: BadRequestError('bad name, request body or parameters'),
+    401: AuthorizationError('insufficient privilege'),
+    404: NotFoundError('no such entity'),
+    409: RevisionError("missing or incorrect '_rev' item"),
+    412: CreationError('name already in use'),
+    415: ContentTypeError("bad 'Content-Type' value"),
+    500: ServerError('internal server error')}
 
 
 if __name__ == '__main__':
