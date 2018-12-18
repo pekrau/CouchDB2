@@ -67,22 +67,17 @@ def test_document_update():
     doc1 = doc.copy()
     db.save(doc1)
     id1 = doc1['_id']
+    rev1 = doc1['_rev']
     assert len(db) == 1
-    docid = doc1.get('_id')
-    assert docid
-    doc1['mood'] = 'excellent'
-    db.save(doc1)
-    doc2 = db[docid]
-    assert doc2['mood'] == 'excellent'
-    doc3 = doc.copy()
-    db.save(doc3)
-    id3 = doc3['_id']
-    assert len(db) == 2
-    assert docid != doc3['_id']
-    if server.version.startswith('2'):
-        docs = db.get_docs(id1, id3, 'dummy')
-        assert len(docs) == 2
-        assert set([d['_id'] for d in docs]) == set([id1, id3])
+    doc2 = doc1.copy()
+    doc2['mood'] = 'excellent'
+    db.save(doc2)
+    doc3 = db[id1]
+    assert doc3['mood'] == 'excellent'
+    rev2 = doc3['_rev']
+    assert rev1 != rev2
+    doc1_copy = db.get(id1, rev=rev1)
+    assert doc1_copy == doc1
     db.destroy()
 
 def test_design_view():

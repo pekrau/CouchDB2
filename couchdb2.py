@@ -18,7 +18,7 @@ import uuid
 
 import requests
 
-__version__ = '0.8.0'
+__version__ = '0.9.0'
 
 JSON_MIME = 'application/json'
 BIN_MIME  = 'application/octet-stream'
@@ -29,12 +29,12 @@ Row = collections.namedtuple('Row', ['id', 'key', 'value', 'doc'])
 OD = collections.OrderedDict
 
 class CouchDB2Exception(Exception):
-    "Base CouchDB2 exception class."
+    "Base CouchDB2 exception."
 
-class NotFoundError(KeyError, CouchDB2Exception):
+class NotFoundError(CouchDB2Exception):
     "No such entity exists."
 
-class BadRequest(CouchDB2Exception):
+class BadRequestError(CouchDB2Exception):
     "Invalid request; bad name, body or headers."
 
 class CreationError(CouchDB2Exception):
@@ -45,6 +45,9 @@ class RevisionError(CouchDB2Exception):
 
 class AuthorizationError(CouchDB2Exception):
     "Current user not authorized to perform the operation."
+
+class ContentTypeError(CouchDB2Exception):
+    "Bad 'Content-Type' value in the request."
 
 class ServerError(CouchDB2Exception):
     "Internal server error."
@@ -98,7 +101,7 @@ class Server(object):
 
     def create(self, name):
         """Create the named database.
-        Raises ValueError if the name is invalid.
+        Raises BadRequestError if the name is invalid.
         Raises AuthorizationError if not server admin privileges.
         Raises CreationError if a database with that name already exists.
         Raises IOError if there is some other error.
@@ -160,12 +163,12 @@ class Server(object):
         201: None,
         202: None,
         304: None,
-        400: BadRequest('bad name, request body or parameters'),
+        400: BadRequestError('bad name, request body or parameters'),
         401: AuthorizationError('insufficient privilege'),
         404: NotFoundError('no such entity'),
         409: RevisionError("missing or incorrect '_rev' item"),
         412: CreationError('name already in use'),
-        415: TypeError("bad 'Content-Type' value"),
+        415: ContentTypeError("bad 'Content-Type' value"),
         500: ServerError('internal server error')}
 
     def _check(self, response, errors={}):
@@ -211,8 +214,11 @@ class Database(object):
         Raises NotFoundError if no such document or database.
         Raises IOError if something else went wrong.
         """
-        response = self.server._GET(self.name, id)
-        return response.json(object_pairs_hook=OD)
+        result = self.get(id)
+        if result is None:
+            raise NotFoundError('no such document')
+        else:
+            return result
 
     def exists(self):
         "Does this database exist?"
@@ -226,7 +232,7 @@ class Database(object):
 
     def create(self):
         """Create this database.
-        Raises ValueError if the name is invalid.
+        Raises BadRequestError if the name is invalid.
         Raises AuthorizationError if not server admin privileges.
         Raises CreationError if a database with that name already exists.
         Raises IOError if there is some other error.
@@ -244,44 +250,30 @@ class Database(object):
 
     def compact(self):
         "Compact the database on disk. May take some time."
-        self.server._POST(self.name, '_compact')
+        self.server._POST(self.name, '_compact',
+                          headers={'Content-Type': JSON_MIME})
 
     def is_compact_running(self):
         "Is a compact operation running?"
         response = self.server._GET(self.name)
         return response.json()['compact_running']
 
-    def get(self, id, default=None):
+    def get(self, id, rev=None, revs_info=False, default=None):
         """Return the document with the given id.
         Returns the default if not found.
         Raises AuthorizationError if not read privilege.
         Raises IOError if there is some other error.
         """
-        try:
-            return self[id]
-        except NotFoundError:
+        params = {}
+        if rev is not None:
+            params['rev'] = rev
+        if revs_info:
+            params['revs_info'] = json.dumps(True)
+        response = self.server._GET(self.name, id,
+                                    errors={404: None}, params=params)
+        if response.status_code == 404:
             return default
-
-    def get_docs(self, *ids):
-        """Return the documents for the given ids.
-        Nothing is returned for an item in the input list that does
-        not match any document.
-        """
-        docs = []
-        for id in ids:
-            if isinstance(id, dict):
-                docs.append(id)
-            else:
-                docs.append({'id': id})
-        response = self.server._POST(self.name, '_bulk_get', json={'docs':docs})
-        result = []
-        for item in response.json(object_pairs_hook=OD)['results']:
-            for doc in item.get('docs', []):
-                try:
-                    result.append(doc['ok'])
-                except KeyError:
-                    pass
-        return result
+        return response.json(object_pairs_hook=OD)
 
     def save(self, doc):
         """Insert or update the document.
@@ -299,8 +291,8 @@ class Database(object):
 
     def delete(self, doc):
         """Delete the document.
-        Raises NotFoundError if no such document.
-        Raises RevisionError if the '_rev' item does not match.
+        Raises NotFoundError if no such document or no '_id' item.
+        Raises RevisionError if no '_rev' item, or it does not match.
         Raises ValueError if the request body or parameters are invalid.
         Raises IOError if something else went wrong.
         """
@@ -366,17 +358,17 @@ class Database(object):
         if limit is not None:
             params['limit'] = json.dumps(limit)
         if not sorted:
-            params['sorted'] = json.dumps(bool(sorted))
+            params['sorted'] = json.dumps(False)
         if descending:
-            params['descending'] = json.dumps(bool(descending))
+            params['descending'] = json.dumps(True)
         if group:
-            params['group'] = json.dumps(bool(group))
+            params['group'] = json.dumps(True)
         if group_level is not None:
             params['group_level'] = json.dumps(group_level)
         if reduce is not None:
             params['reduce'] = json.dumps(bool(reduce))
         if include_docs:
-            params['include_docs'] = 'true'
+            params['include_docs'] = json.dumps(True)
         response = self.server._GET(self.name, '_design', designname, '_view',
                                     viewname, params=params)
         data = response.json()
@@ -393,7 +385,7 @@ class Database(object):
         'selector' is a partial filter selector.
         Returns a dictionary with items 'id' (design document name),
         'name' (index name) and 'result' ('created' or 'exists').
-        Raises BadRequest if the index is malformed.
+        Raises BadRequestError if the index is malformed.
         Raises AuthorizationError if not server admin privileges.
         Raises ServerError if there is an internal server error.
         """
@@ -412,7 +404,7 @@ class Database(object):
         """Select documents according to the selector.
         Returns a dictionary with items 'docs', 'warning', 'execution_stats'
         and 'bookmark'.
-        Raises BadRequest if the selector is malformed.
+        Raises BadRequestError if the selector is malformed.
         Raises AuthorizationError if not privileged to read.
         Raises ServerError if there is an internal server error.
         """
@@ -460,6 +452,7 @@ class Database(object):
 
 
 if __name__ == '__main__':
+    import time
     server = Server()
     try:
         db = server.get('mytest')
@@ -475,9 +468,12 @@ if __name__ == '__main__':
     doc = {'type': 'adoc', 'name': 'blopp'}
     db.save(doc)
     id2 = doc['_id']
-    doc = {'type': 'bdoc', 'name': 'blonk'}
+    doc['fruit'] = 'banana'
     db.save(doc)
     id3 = doc['_id']
-    result = db.get_docs(id1, id1x, id2, 'dummy')
-    print(json.dumps(result, indent=2))
+    db.compact()
+    while db.is_compact_running():
+        print('sleeping...')
+        time.sleep(0.5)
+    print(json.dumps(db.get(id3, revs_info=True), indent=2))
     db.destroy()
