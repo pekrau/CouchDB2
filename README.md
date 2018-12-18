@@ -16,34 +16,34 @@ Server.get(self, name, check=True)
 Get the named database.
 - Raises NotFoundError if 'check' is True and no database exists.
 
-### __str__
+### \_\_str\_\_
 ```python
-Server.__str__(self)
+Server.\_\_str\_\_(self)
 ```
 Return a simple string representation of the server interface.
 
-### __len__
+### \_\_len\_\_
 ```python
-Server.__len__(self)
+Server.\_\_len\_\_(self)
 ```
 Return the number of user-defined databases.
 
-### __iter__
+### \_\_iter\_\_
 ```python
-Server.__iter__(self)
+Server.\_\_iter\_\_(self)
 ```
 Return an iterator over all user-defined databases on the server.
 
-### __getitem__
+### \_\_getitem\_\_
 ```python
-Server.__getitem__(self, name)
+Server.\_\_getitem\_\_(self, name)
 ```
 Get the named database.
 - Raises NotFoundError if no such database.
 
-### __contains__
+### \_\_contains\_\_
 ```python
-Server.__contains__(self, name)
+Server.\_\_contains\_\_(self, name)
 ```
 Does the named database exist?
 
@@ -63,29 +63,29 @@ Database(self, server, name, check=True)
 ```
 Interface to a named CouchDB database.
 
-### __str__
+### \_\_str\_\_
 ```python
-Server.__str__(self)
+Server.\_\_str\_\_(self)
 ```
 Return the name of the CouchDB database.
 
-### __len__
+### \_\_len\_\_
 ```python
-Server.__len__(self)
+Server.\_\_len\_\_(self)
 ```
 Return the number of documents in the database.
 
-### __contains__
+### \_\_contains\_\_
 ```python
-Server.__contains__(self, id)
+Server.\_\_contains\_\_(self, id)
 ```
 Does a document with the given id exist in the database?
 - Raises AuthorizationError if not privileged to read.
 - Raises IOError if something else went wrong.
 
-### __getitem__
+### \_\_getitem\_\_
 ```python
-Server.__getitem__(self, id)
+Server.\_\_getitem\_\_(self, id)
 ```
 Return the document with the given id.
 - Raises AuthorizationError if not privileged to read.
