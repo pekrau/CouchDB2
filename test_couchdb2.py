@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
-"""Test the Python interface module to CouchDB (version 2).
+"""Test the Python interface module to CouchDB v2.x.
 Uses py.test.
 """
 
-from __future__ import print_function, unicode_literals
+from __future__ import print_function
 
 import pytest
 

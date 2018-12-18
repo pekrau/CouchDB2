@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 """Slim Python interface module to CouchDB v2.x.
 
 Relies on requests, http://docs.python-requests.org/en/master/
 """
 
-from __future__ import print_function, unicode_literals
+from __future__ import print_function
 
 import collections
 from collections import OrderedDict as OD
@@ -31,7 +30,9 @@ class Server(object):
 
     def __init__(self, href='http://localhost:5984/',
                  username=None, password=None):
-        "Raises IOError if server connection failed."
+        """Connect to the CouchDB server.
+        - Raises IOError if failure.
+        """
         self.href = href.rstrip('/') + '/'
         self.username = username
         self.password = password
@@ -42,15 +43,16 @@ class Server(object):
         self.version = self._GET().json()['version']
 
     def __str__(self):
+        "Return a simple string representation of the server interface."
         return "CouchDB {s.version} {s.href}".format(s=self)
 
     def __len__(self):
-        "Number of user-defined databases."
+        "Return the number of user-defined databases."
         data = self._GET('_all_dbs').json()
         return len([n for n in data if not n.startswith('_')])
 
     def __iter__(self):
-        "Iterate over all user-defined databases on the server."
+        "Return an iterator over all user-defined databases on the server."
         data = self._GET('_all_dbs').json()
         return iter([Database(self, n, check=False) 
                      for n in data if not n.startswith('_')])
@@ -154,6 +156,7 @@ class Database(object):
             self.check()
 
     def __str__(self):
+        "Return the name of the CouchDB database."
         return self.name
 
     def __len__(self):

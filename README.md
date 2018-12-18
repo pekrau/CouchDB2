@@ -1,35 +1,12 @@
 # CouchDB2
+
 Slim Python interface module to CouchDB v2.x.
 
 Relies on requests, http://docs.python-requests.org/en/master/
 
-## Row
-```python
-Row(self)
-```
-Row(id, key, value, doc)
-### doc
-Alias for field number 3
-### id
-Alias for field number 0
-### key
-Alias for field number 1
-### value
-Alias for field number 2
-## ViewResult
-```python
-ViewResult(self)
-```
-ViewResult(rows, offset, total_rows)
-### offset
-Alias for field number 1
-### rows
-Alias for field number 0
-### total_rows
-Alias for field number 2
 ## Server
 ```python
-Server(self, href=u'http://localhost:5984/', username=None, password=None)
+Server(self, href='http://localhost:5984/', username=None, password=None)
 ```
 Connection to the CouchDB server.
 ### get
@@ -38,6 +15,37 @@ Server.get(self, name, check=True)
 ```
 Get the named database.
 - Raises NotFoundError if 'check' is True and no database exists.
+
+### __str__
+```python
+Server.__str__(self)
+```
+Return a simple string representation of the server interface.
+
+### __len__
+```python
+Server.__len__(self)
+```
+Return the number of user-defined databases.
+
+### __iter__
+```python
+Server.__iter__(self)
+```
+Return an iterator over all user-defined databases on the server.
+
+### __getitem__
+```python
+Server.__getitem__(self, name)
+```
+Get the named database.
+- Raises NotFoundError if no such database.
+
+### __contains__
+```python
+Server.__contains__(self, name)
+```
+Does the named database exist?
 
 ### create
 ```python
@@ -54,6 +62,36 @@ Create the named database.
 Database(self, server, name, check=True)
 ```
 Interface to a named CouchDB database.
+
+### __str__
+```python
+Server.__str__(self)
+```
+Return the name of the CouchDB database.
+
+### __len__
+```python
+Server.__len__(self)
+```
+Return the number of documents in the database.
+
+### __contains__
+```python
+Server.__contains__(self, id)
+```
+Does a document with the given id exist in the database?
+- Raises AuthorizationError if not privileged to read.
+- Raises IOError if something else went wrong.
+
+### __getitem__
+```python
+Server.__getitem__(self, id)
+```
+Return the document with the given id.
+- Raises AuthorizationError if not privileged to read.
+- Raises NotFoundError if no such document or database.
+- Raises IOError if something else went wrong.
+
 ### exists
 ```python
 Database.exists(self)
@@ -248,3 +286,27 @@ Bad 'Content-Type' value in the request.
 ServerError(self)
 ```
 Internal server error.
+## Row
+```python
+Row(self)
+```
+Row(id, key, value, doc)
+### doc
+Alias for field number 3
+### id
+Alias for field number 0
+### key
+Alias for field number 1
+### value
+Alias for field number 2
+## ViewResult
+```python
+ViewResult(self)
+```
+ViewResult(rows, offset, total_rows)
+### offset
+Alias for field number 1
+### rows
+Alias for field number 0
+### total_rows
+Alias for field number 2
