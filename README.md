@@ -16,13 +16,6 @@ pip install [-e] git+https://github.com/pekrau/CouchDB2.git#egg=couchdb2
 Server(self, href='http://localhost:5984/', username=None, password=None)
 ```
 Connection to the CouchDB server.
-### get
-```python
-Server.get(self, name, check=True)
-```
-Get the named database.
-- Raises NotFoundError if 'check' is True and no database exists.
-
 ### \_\_str\_\_
 ```python
 Server.__str__(self)
@@ -53,6 +46,13 @@ Get the named database.
 Server.__contains__(self, name)
 ```
 Does the named database exist?
+
+### get
+```python
+Server.get(self, name, check=True)
+```
+Get the named database.
+- Raises NotFoundError if 'check' is True and no database exists.
 
 ### create
 ```python
@@ -247,7 +247,7 @@ Returns a dictionary with items 'id' (design document name),
 ```python
 Database.find(self, selector, limit=None, skip=None, sort=None, fields=None, use_index=None, bookmark=None, update=None)
 ```
-Select documents according to the selector.
+Select documents according to the Mango index selector.
 
 Returns a dictionary with items 'docs', 'warning', 'execution_stats'
 and 'bookmark'.
