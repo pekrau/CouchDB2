@@ -280,7 +280,7 @@ If the filepath ends with '.gz', the tar file is gzip compressed.
 
 The `_rev` item of each document is kept.
 
-A tuple (ndocs, nfiles) is returned.
+A tuple `(ndocs, nfiles)` is returned.
 
 ### undump
 ```python
@@ -291,7 +291,7 @@ Load the named tar file, which must have been produced by `dump`.
 NOTE: The documents are just added to the database, ignoring any
 `_rev` items.
 
-A tuple (ndocs, nfiles) is returned.
+A tuple `(ndocs, nfiles)` is returned.
 
 ## CouchDB2Exception
 ```python
