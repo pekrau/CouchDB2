@@ -1,6 +1,6 @@
 """Slim Python interface module to CouchDB v2.x.
 
-Relies on requests, http://docs.python-requests.org/en/master/
+Relies on requests: http://docs.python-requests.org/en/master/
 """
 
 # To generate Markdown documentation:
@@ -8,7 +8,7 @@ Relies on requests, http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 import collections
 from collections import OrderedDict as OD
@@ -467,8 +467,9 @@ class Database(object):
                 info.size = len(data)
                 outfile.addfile(info, io.BytesIO(data))
                 ndocs += 1
+                # Attachments must follow their document.
                 for attname in doc.get('_attachments', dict()):
-                    info = tarfile.TarInfo("{0}/_att/{1}".format(
+                    info = tarfile.TarInfo("{0}_att/{1}".format(
                         doc['_id'], attname))
                     attfile = self.get_attachment(doc, attname)
                     if attfile is None:
@@ -485,7 +486,7 @@ class Database(object):
         """Load the named tar file, which must have been produced by `dump`.
 
         NOTE: The documents are just added to the database, ignoring any
-        `_rev` items.
+        `_rev` items. This implies that they may not already exist.
 
         A tuple (ndocs, nfiles) is returned.
         """
@@ -498,7 +499,7 @@ class Database(object):
                 itemdata = itemfile.read()
                 itemfile.close()
                 if item.name in atts:
-                    # The attachment must be after its doc in the tarfile.
+                    # An attachment follows its document.
                     self.put_attachment(doc, itemdata, **atts.pop(item.name))
                     nfiles += 1
                 else:
@@ -508,7 +509,7 @@ class Database(object):
                     self.save(doc)
                     ndocs += 1
                     for attname, attinfo in atts.items():
-                        key = "{0}/_att/{1}".format(doc['_id'], attname)
+                        key = "{0}_att/{1}".format(doc['_id'], attname)
                         atts[key] = dict(filename=attname,
                                          content_type=attinfo['content_type'])
         return (ndocs, nfiles)
