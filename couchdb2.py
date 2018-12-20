@@ -5,6 +5,8 @@ Relies on requests, http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
+__version__ = '0.9.1'
+
 import collections
 from collections import OrderedDict as OD
 import json
@@ -18,8 +20,6 @@ except ImportError:             # Python 3
 import uuid
 
 import requests
-
-__version__ = '0.9.0'
 
 JSON_MIME = 'application/json'
 BIN_MIME  = 'application/octet-stream'
