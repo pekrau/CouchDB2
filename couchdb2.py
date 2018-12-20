@@ -3,20 +3,19 @@
 Relies on requests, http://docs.python-requests.org/en/master/
 """
 
+# To generate Markdown documentation:
+# $ pydocmd simple couchdb2++ > docs.md
+
 from __future__ import print_function
 
-__version__ = '0.9.1'
+__version__ = '1.0.0'
 
 import collections
 from collections import OrderedDict as OD
+import io
 import json
 import mimetypes
-try:                            # Python 2
-    from StringIO import StringIO as ContentFile
-    ContentFile.read = ContentFile.getvalue
-except ImportError:             # Python 3
-    from io import BytesIO as ContentFile
-    ContentFile.read = ContentFile.getvalue
+import tarfile
 import uuid
 
 import requests
@@ -149,6 +148,8 @@ class Server(object):
 class Database(object):
     "Interface to a named CouchDB database."
 
+    CHUNK_SIZE = 100
+
     def __init__(self, server, name, check=True):
         self.server = server
         self.name = name
@@ -170,6 +171,10 @@ class Database(object):
         """
         response = self.server._HEAD(self.name, id, errors={404: None})
         return response.status_code in (200, 304)
+
+    def __iter__(self):
+        "Iterate over all documents in the database."
+        return _DatabaseIterator(self, chunk_size=self.CHUNK_SIZE)
 
     def __getitem__(self, id):
         """Return the document with the given id.
@@ -315,7 +320,19 @@ class Database(object):
              skip=None, limit=None, sorted=True, descending=False,
              group=False, group_level=None, reduce=None,
              include_docs=False):
-        "Return the selected rows from the named design view."
+        """Return the selected rows from the named design view.
+
+        A #ViewResult object is returned, containing the following attributes:
+        - `rows`: the list of #Row objects.
+        - `offset`: the offset used for this set of rows.
+        - `total_rows`: the total number of rows selected.
+
+        A #Row object contains the following attributes:
+        - `id`: the identifier of the document, if any.
+        - `key`: the key for the index row.
+        - `value`: the value for the index row.
+        - `doc`: the document, if any.
+        """
         params = {}
         if startkey is not None:
             params['startkey'] = json.dumps(startkey)
@@ -427,7 +444,104 @@ class Database(object):
         "Return a file-like object containing the content of the attachment."
         response = self.server._GET(self.name, doc['_id'], filename,
                                     headers={'If-Match': doc['_rev']})
-        return ContentFile(response.content)
+        return io.BytesIO(response.content)
+
+    def dump(self, filepath):
+        """Dump the entire database to the named tar file.
+        If the filepath ends with '.gz', the tar file is gzip compressed.
+
+        The `_rev` item of each document is kept.
+
+        A tuple (ndocs, nfiles) is returned.
+        """
+        ndocs = 0
+        nfiles = 0
+        if filepath.endswith('.gz'):
+            mode = 'w:gz'
+        else:
+            mode = 'w'
+        with tarfile.open(filepath, mode=mode) as outfile:
+            for doc in self:
+                info = tarfile.TarInfo(doc['_id'])
+                data = json.dumps(doc)
+                info.size = len(data)
+                outfile.addfile(info, io.BytesIO(data))
+                ndocs += 1
+                for attname in doc.get('_attachments', dict()):
+                    info = tarfile.TarInfo("{0}/_att/{1}".format(
+                        doc['_id'], attname))
+                    attfile = self.get_attachment(doc, attname)
+                    if attfile is None:
+                        attdata = ''
+                    else:
+                        attdata = attfile.read()
+                        attfile.close()
+                    info.size = len(data)
+                    outfile.addfile(info, io.BytesIO(attdata))
+                    nfiles += 1
+        return (ndocs, nfiles)
+
+    def undump(self, filepath):
+        """Load the named tar file, which must have been produced by `dump`.
+
+        NOTE: The documents are just added to the database, ignoring any
+        `_rev` items.
+
+        A tuple (ndocs, nfiles) is returned.
+        """
+        ndocs = 0
+        nfiles = 0
+        atts = dict()
+        with tarfile.open(filepath, mode='r') as infile:
+            for item in infile:
+                itemfile = infile.extractfile(item)
+                itemdata = itemfile.read()
+                itemfile.close()
+                if item.name in atts:
+                    # The attachment must be after its doc in the tarfile.
+                    self.put_attachment(doc, itemdata, **atts.pop(item.name))
+                    nfiles += 1
+                else:
+                    doc = json.loads(itemdata)
+                    doc.pop('_rev', None)
+                    atts = doc.pop('_attachments', dict())
+                    self.save(doc)
+                    ndocs += 1
+                    for attname, attinfo in atts.items():
+                        key = "{0}/_att/{1}".format(doc['_id'], attname)
+                        atts[key] = dict(filename=attname,
+                                         content_type=attinfo['content_type'])
+        return (ndocs, nfiles)
+
+
+class _DatabaseIterator(object):
+    "Iterator over all documents in a database."
+
+    def __init__(self, db, chunk_size):
+        self.db = db
+        self.skip = 0
+        self.chunk = []
+        self.chunk_size = chunk_size
+
+    def __next__(self):
+        return self.next()
+
+    def next(self):
+        try:
+            return self.chunk.pop()
+        except IndexError:
+            response = self.db.server._GET(self.db.name, '_all_docs',
+                                           params={'include_docs': True,
+                                                   'skip': self.skip,
+                                                   'limit': self.chunk_size})
+            data = response.json()
+            rows = data['rows']
+            if len(rows) == 0:
+                raise StopIteration
+            self.chunk = [r['doc'] for r in rows]
+            self.chunk.reverse()
+            self.skip = data['offset'] + len(self.chunk)
+            return self.chunk.pop()
 
 
 ViewResult = collections.namedtuple('ViewResult',
@@ -458,6 +572,7 @@ class ContentTypeError(CouchDB2Exception):
 class ServerError(CouchDB2Exception):
     "Internal server error."
 
+
 _ERRORS = {
     200: None,
     201: None,
@@ -479,22 +594,26 @@ if __name__ == '__main__':
         db = server.get('mytest')
     except NotFoundError:
         db = server.create('mytest')
-    doc = {'type': 'adoc', 'name': 'blah'}
-    db.save(doc)
-    rev = doc['_rev']
-    doc['other'] = 'stuff'
-    db.save(doc)
-    id1 = {'id': doc['_id'], 'rev': rev}
-    id1x = {'id': doc['_id'], 'rev': doc['_rev']}
-    doc = {'type': 'adoc', 'name': 'blopp'}
-    db.save(doc)
-    id2 = doc['_id']
-    doc['fruit'] = 'banana'
-    db.save(doc)
-    id3 = doc['_id']
-    db.compact()
-    while db.is_compact_running():
-        print('sleeping...')
-        time.sleep(0.5)
-    print(json.dumps(db.get(id3, revs_info=True), indent=2))
+    doc = {'type': 'another', 'name': 'blapp'}
+    docs = {}
+    docx = doc.copy()
+    db.save(docx)
+    db.put_attachment(docx, open(__file__, 'rb'))
+    docx = db[docx['_id']]      # To get the '_attachments' member
+    docs[docx['_id']] = docx
+    for n in range(8):
+        docx = doc.copy()
+        docx['n'] = n
+        db.save(docx)
+        docs[docx['_id']] = docx
+    print('# docs', len(db))
+    count = 0
+    docs2 = {}
+    for doc in db:
+        count += 1
+        docs2[doc['_id']] = doc
+        print(json.dumps(doc))
+    print('# docs', count)
+    assert docs == docs2
+    db.dump('test_dump.tar.gz')
     db.destroy()

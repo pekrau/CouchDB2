@@ -4,6 +4,13 @@ Slim Python interface module to CouchDB v2.x.
 
 Relies on requests, http://docs.python-requests.org/en/master/
 
+## Installation
+
+Quick-and-dirty method, since this module is not yet on PyPi:
+```
+pip install [-e] git+https://github.com/pekrau/CouchDB2.git#egg=couchdb2
+```
+
 ## Server
 ```python
 Server(self, href='http://localhost:5984/', username=None, password=None)
@@ -75,13 +82,19 @@ Server.__len__(self)
 ```
 Return the number of documents in the database.
 
-### __contains__
+### \_\_contains\_\_
 ```python
 Server.__contains__(self, id)
 ```
 Does a document with the given id exist in the database?
 - Raises AuthorizationError if not privileged to read.
 - Raises IOError if something else went wrong.
+
+### \_\_iter\_\_
+```python
+Server.__iter__(self)
+```
+Iterate over all documents in the database.
 
 ### \_\_getitem\_\_
 ```python
@@ -200,6 +213,18 @@ More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
 Database.view(self, designname, viewname, key=None, keys=None, startkey=None, endkey=None, skip=None, limit=None, sorted=True, descending=False, group=False, group_level=None, reduce=None, include_docs=False)
 ```
 Return the selected rows from the named design view.
+
+A `ViewResult` object is returned, containing the following attributes:
+- `rows`: the list of `Row` objects.
+- `offset`: the offset used for this set of rows.
+- `total_rows`: the total number of rows selected.
+
+A `Row` object contains the following attributes:
+- `id`: the identifier of the document, if any.
+- `key`: the key for the index row.
+- `value`: the value for the index row.
+- `doc`: the document, if any.
+
 ### load_index
 ```python
 Database.load_index(self, fields, id=None, name=None, selector=None)
@@ -246,6 +271,28 @@ If no filename, then an attempt is made to get it from content object.
 Database.get_attachment(self, doc, filename)
 ```
 Return a file-like object containing the content of the attachment.
+### dump
+```python
+Database.dump(self, filepath)
+```
+Dump the entire database to the named tar file.
+If the filepath ends with '.gz', the tar file is gzip compressed.
+
+The `_rev` item of each document is kept.
+
+A tuple (ndocs, nfiles) is returned.
+
+### undump
+```python
+Database.undump(self, filepath)
+```
+Load the named tar file, which must have been produced by `dump`.
+
+NOTE: The documents are just added to the database, ignoring any
+`_rev` items.
+
+A tuple (ndocs, nfiles) is returned.
+
 ## CouchDB2Exception
 ```python
 CouchDB2Exception(self)

@@ -119,6 +119,20 @@ def test_design_view():
     assert result.rows[0].value == 2
     db.destroy()
 
+def test_iterator():
+    db = couchdb2.Server().create('mytest')
+    orig = {'field': 'data'}
+    N = couchdb2.Database.CHUNK_SIZE + 1
+    docs = {}
+    for n in range(N):
+        doc = orig.copy()
+        doc['n'] = n
+        db.save(doc)
+        docs[doc['_id']] = doc
+    assert len(db) == N
+    assert docs == dict([(d['_id'], d) for d in db])
+    db.destroy()
+
 def test_index():
     server = couchdb2.Server()
     if not server.version.startswith('2'): return
