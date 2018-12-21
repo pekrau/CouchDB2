@@ -578,6 +578,7 @@ _ERRORS = {
     304: None,
     400: BadRequestError('bad name, request body or parameters'),
     401: AuthorizationError('insufficient privilege'),
+    403: AuthorizationError('insufficient privilege'),
     404: NotFoundError('no such entity'),
     409: RevisionError("missing or incorrect '_rev' item"),
     412: CreationError('name already in use'),
