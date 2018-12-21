@@ -13,50 +13,50 @@ pip install [-e] git+https://github.com/pekrau/CouchDB2.git#egg=couchdb2
 
 ## Server
 ```python
-Server(self, href='http://localhost:5984/', username=None, password=None)
+server = Server(href='http://localhost:5984/', username=None, password=None)
 ```
-Connection to the CouchDB server.
+A connection to the CouchDB server.
 ### \_\_str\_\_
 ```python
-Server.__str__(self)
+str(server)
 ```
 Return a simple string representation of the server interface.
 
 ### \_\_len\_\_
 ```python
-Server.__len__(self)
+len(server)
 ```
 Return the number of user-defined databases.
 
 ### \_\_iter\_\_
 ```python
-Server.__iter__(self)
+iter(server)
 ```
 Return an iterator over all user-defined databases on the server.
 
 ### \_\_getitem\_\_
 ```python
-Server.__getitem__(self, name)
+server[name]
 ```
 Get the named database.
 - Raises NotFoundError if no such database.
 
 ### \_\_contains\_\_
 ```python
-Server.__contains__(self, name)
+name in server
 ```
 Does the named database exist?
 
 ### get
 ```python
-Server.get(self, name, check=True)
+server.get(name, check=True)
 ```
 Get the named database.
 - Raises NotFoundError if 'check' is True and no database exists.
 
 ### create
 ```python
-Server.create(self, name)
+server.create(name)
 ```
 Create the named database.
 - Raises BadRequestError if the name is invalid.
@@ -66,25 +66,25 @@ Create the named database.
 
 ## Database
 ```python
-Database(self, server, name, check=True)
+db = Database(server, name, check=True)
 ```
 Interface to a named CouchDB database.
 
 ### \_\_str\_\_
 ```python
-Server.__str__(self)
+str(db)
 ```
 Return the name of the CouchDB database.
 
 ### \_\_len\_\_
 ```python
-Server.__len__(self)
+len(db)
 ```
 Return the number of documents in the database.
 
 ### \_\_contains\_\_
 ```python
-Server.__contains__(self, id)
+id in db
 ```
 Does a document with the given id exist in the database?
 - Raises AuthorizationError if not privileged to read.
@@ -92,13 +92,13 @@ Does a document with the given id exist in the database?
 
 ### \_\_iter\_\_
 ```python
-Server.__iter__(self)
+iter(db)
 ```
 Iterate over all documents in the database.
 
 ### \_\_getitem\_\_
 ```python
-Server.__getitem__(self, id)
+db[id]
 ```
 Return the document with the given id.
 - Raises AuthorizationError if not privileged to read.
@@ -107,17 +107,17 @@ Return the document with the given id.
 
 ### exists
 ```python
-Database.exists(self)
+db.exists()
 ```
 Does this database exist?
 ### check
 ```python
-Database.check(self)
+db.check()
 ```
 - Raises NotFoundError if this database does not exist.
 ### create
 ```python
-Database.create(self)
+db.create()
 ```
 Create this database.
 - Raises BadRequestError if the name is invalid.
@@ -127,7 +127,7 @@ Create this database.
 
 ### destroy
 ```python
-Database.destroy(self)
+db.destroy()
 ```
 Delete this database and all its contents.
 - Raises AuthorizationError if not server admin privileges.
@@ -136,17 +136,17 @@ Delete this database and all its contents.
 
 ### compact
 ```python
-Database.compact(self)
+db.compact()
 ```
 Compact the database on disk. May take some time.
 ### is_compact_running
 ```python
-Database.is_compact_running(self)
+db.is_compact_running()
 ```
 Is a compact operation running?
 ### get
 ```python
-Database.get(self, id, rev=None, revs_info=False, default=None)
+db.get(id, rev=None, revs_info=False, default=None)
 ```
 Return the document with the given id.
 - Returns the default if not found.
@@ -155,7 +155,7 @@ Return the document with the given id.
 
 ### save
 ```python
-Database.save(self, doc)
+db.save(doc)
 ```
 Insert or update the document.
 
@@ -169,7 +169,7 @@ having a UUID4 value. The '_rev' item is added or updated.
 
 ### delete
 ```python
-Database.delete(self, doc)
+db.delete(doc)
 ```
 Delete the document.
 - Raises NotFoundError if no such document or no '_id' item.
@@ -179,7 +179,7 @@ Delete the document.
 
 ### load_design
 ```python
-Database.load_design(self, name, doc, rebuild=True)
+db.load_design(name, doc, rebuild=True)
 ```
 Load the design document under the given name.
 
@@ -210,7 +210,10 @@ More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
 
 ### view
 ```python
-Database.view(self, designname, viewname, key=None, keys=None, startkey=None, endkey=None, skip=None, limit=None, sorted=True, descending=False, group=False, group_level=None, reduce=None, include_docs=False)
+db.view(designname, viewname, key=None, keys=None, startkey=None, endkey=None,
+        skip=None, limit=None, sorted=True, descending=False,
+        group=False, group_level=None, reduce=None,
+        include_docs=False)
 ```
 Return the selected rows from the named design view.
 
@@ -227,7 +230,7 @@ A `Row` object contains the following attributes:
 
 ### load_index
 ```python
-Database.load_index(self, fields, id=None, name=None, selector=None)
+db.load_index(fields, id=None, name=None, selector=None)
 ```
 Load a Mango index specification.
 
@@ -245,7 +248,8 @@ Returns a dictionary with items 'id' (design document name),
 
 ### find
 ```python
-Database.find(self, selector, limit=None, skip=None, sort=None, fields=None, use_index=None, bookmark=None, update=None)
+db.find(selector, use_index=None, limit=None, skip=None, sort=None,
+        fields=None, bookmark=None, update=None)
 ```
 Select documents according to the Mango index selector.
 
@@ -258,7 +262,7 @@ and 'bookmark'.
 
 ### put_attachment
 ```python
-Database.put_attachment(self, doc, content, filename=None, content_type=None)
+db.put_attachment(doc, content, filename=None, content_type=None)
 ```
 'content' is a string or a file-like object.
 
@@ -268,12 +272,12 @@ If no filename, then an attempt is made to get it from content object.
 
 ### get_attachment
 ```python
-Database.get_attachment(self, doc, filename)
+db.get_attachment(doc, filename)
 ```
 Return a file-like object containing the content of the attachment.
 ### dump
 ```python
-Database.dump(self, filepath)
+db.dump(filepath)
 ```
 Dump the entire database to the named tar file.
 If the filepath ends with '.gz', the tar file is gzip compressed.
@@ -284,7 +288,7 @@ A tuple `(ndocs, nfiles)` is returned.
 
 ### undump
 ```python
-Database.undump(self, filepath)
+db.undump(filepath)
 ```
 Load the named tar file, which must have been produced by `dump`.
 
@@ -334,26 +338,32 @@ ServerError(self)
 ```
 Internal server error.
 ## Row
+
+Named tuple object returned in ViewResult `rows`.
+
 ```python
-Row(self)
-```
 Row(id, key, value, doc)
-### doc
-Alias for field number 3
+```
 ### id
 Alias for field number 0
 ### key
 Alias for field number 1
 ### value
 Alias for field number 2
+### doc
+Alias for field number 3
 ## ViewResult
+
+Named tuple object returned as result from `db.view()`.
+
 ```python
-ViewResult(self)
-```
 ViewResult(rows, offset, total_rows)
+```
+### rows
+Contains the rows found: list of `Row` objects.
+
+Alias for field number 0
 ### offset
 Alias for field number 1
-### rows
-Alias for field number 0
 ### total_rows
 Alias for field number 2

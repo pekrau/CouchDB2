@@ -3,9 +3,6 @@
 Relies on requests: http://docs.python-requests.org/en/master/
 """
 
-# To generate Markdown documentation:
-# $ pydocmd simple couchdb2++ > docs.md
-
 from __future__ import print_function
 
 __version__ = '1.0.1'
@@ -25,7 +22,7 @@ BIN_MIME  = 'application/octet-stream'
 
 
 class Server(object):
-    "Connection to the CouchDB server."
+    "A connection to the CouchDB server."
 
     def __init__(self, href='http://localhost:5984/',
                  username=None, password=None):
