@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 import collections
 from collections import OrderedDict as OD
