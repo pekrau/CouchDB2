@@ -64,6 +64,14 @@ Create the named database.
 - Raises CreationError if a database with that name already exists.
 - Raises IOError if there is some other error.
 
+### get_config
+```python
+server.get_config(nodename='_local')
+```
+Get the named node's configuration.
+- Raises AuthorizationError if not server admin privileges.
+- Raises IOError if there is some other error.
+
 ## Database
 ```python
 db = Database(server, name, check=True)

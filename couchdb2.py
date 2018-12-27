@@ -5,10 +5,10 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.0.2'
+__version__ = '1.0.3'
 
 import collections
-from collections import OrderedDict as OD
+from collections import OrderedDict
 import io
 import json
 import mimetypes
@@ -78,6 +78,10 @@ class Server(object):
         - Raises IOError if there is some other error.
         """
         return Database(self, name, check=False).create()
+
+    def get_config(self, nodename='_local'):
+        "Get the named node's configuration."
+        return self._GET('_node', nodename, '_config').json()
 
     def _HEAD(self, *segments, **kwargs):
         "HTTP HEAD request to the CouchDB server."
@@ -238,7 +242,7 @@ class Database(object):
                                     errors={404: None}, params=params)
         if response.status_code == 404:
             return default
-        return response.json(object_pairs_hook=OD)
+        return response.json(object_pairs_hook=OrderedDict)
 
     def save(self, doc):
         """Insert or update the document.
@@ -415,7 +419,7 @@ class Database(object):
         if update is not None:
             data['update'] = update
         response = self.server._POST(self.name, '_find', json=data)
-        return response.json(object_pairs_hook=OD)
+        return response.json(object_pairs_hook=OrderedDict)
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
         """'content' is a string or a file-like object.
@@ -587,32 +591,5 @@ _ERRORS = {
 
 
 if __name__ == '__main__':
-    import time
     server = Server()
-    try:
-        db = server.get('mytest')
-    except NotFoundError:
-        db = server.create('mytest')
-    doc = {'type': 'another', 'name': 'blapp'}
-    docs = {}
-    docx = doc.copy()
-    db.save(docx)
-    db.put_attachment(docx, open(__file__, 'rb'))
-    docx = db[docx['_id']]      # To get the '_attachments' member
-    docs[docx['_id']] = docx
-    for n in range(8):
-        docx = doc.copy()
-        docx['n'] = n
-        db.save(docx)
-        docs[docx['_id']] = docx
-    print('# docs', len(db))
-    count = 0
-    docs2 = {}
-    for doc in db:
-        count += 1
-        docs2[doc['_id']] = doc
-        print(json.dumps(doc))
-    print('# docs', count)
-    assert docs == docs2
-    db.dump('test_dump.tar.gz')
-    db.destroy()
+    print(json.dumps(server.get_config(), indent=2))
