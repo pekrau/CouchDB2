@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.1.0'
+__version__ = '1.1.2'
 
 import argparse
 import collections
@@ -305,7 +305,7 @@ class Database(object):
 
         More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
 
-        - Raises AuthorizationError if not privileged to read.
+        - Raises AuthorizationError if not privileged to write.
         - Raise NotFoundError if no such database.
         - Raises IOError if something else went wrong.
         """
@@ -611,10 +611,12 @@ def get_parser():
     p.add_argument('-p', '--password', help='password')
     p.add_argument('-P', '--interactive_password', action='store_true',
                    help='ask for the password by interactive input')
+    p.add_argument('-o', '--output', metavar='FILEPATH',
+                   help='write the output in JSON format to the given file')
     p.add_argument('-V', '--version', action='store_true',
                    help='output CouchDB server version')
     p.add_argument('-l', '--list', action='store_true',
-                   help='list the databases on the server')
+                   help='output a list of the databases on the server')
     p.add_argument('-c', '--create', action='store_true',
                    help='create the database')
     p.add_argument('-x', '--delete', action='store_true',
@@ -623,12 +625,10 @@ def get_parser():
                    help='do not ask for interactive confirmation')
     p.add_argument('-i', '--information', action='store_true',
                    help='output information about the database')
-    p.add_argument('-a', '--save', metavar="FILENAME_OR_DOC",
-                   help='save the document (file or explicit) in the database')
-    p.add_argument('-g', '--get', metavar="ID",
+    p.add_argument('-a', '--save', metavar='FILEPATH_OR_DOC',
+                   help='save the document (from file or explicit)')
+    p.add_argument('-g', '--get', metavar="DOCID",
                    help='output the document with the given identifier')
-    p.add_argument('-G', '--getfile', metavar="ID",
-                   help='write the document with the given identifier to a file')
     p.add_argument('--dump', metavar='FILENAME',
                    help='create a dump file for the database')
     p.add_argument('--undump', metavar='FILENAME',
@@ -663,7 +663,7 @@ def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
                 print('settings from file', filepath)
         except IOError:
             if pargs.verbose:
-                print('Warning: could not read settings file', pargs.settings)
+                print('Warning: could not read settings file', filepath)
     for key in ['COUCHDB_SERVER', 'COUCHDB2_SERVER']:
         try:
             settings['SERVER'] = settings[key]
@@ -693,6 +693,15 @@ def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
         settings['USERNAME'] = pargs.username
     if pargs.password:
         settings['PASSWORD'] = pargs.password
+    if pargs.verbose:
+        s = collections.OrderedDict()
+        for key in ['SERVER', 'DATABASE', 'USERNAME']:
+            s[key] = settings[key]
+        if settings['PASSWORD'] is None:
+            s['PASSWORD'] = None
+        else:
+            s['PASSWORD'] = '****'
+        print('settings:', json.dumps(s))
     return settings
 
 def get_database(server, settings):
@@ -700,15 +709,16 @@ def get_database(server, settings):
         sys.exit('error: no database defined')
     return server[settings['DATABASE']]
 
-def main():
+def verbosity(pargs, *args):
+    if not pargs.verbose: return
+    print(*args)
+
+def main(pargs, settings):
     "CouchDB2 command line tool."
     try:
         input = raw_input
     except NameError:
         pass
-    parser = get_parser()
-    pargs = parser.parse_args()
-    settings = get_settings(pargs)
     if pargs.interactive_password:
         settings['PASSWORD'] = getpass.getpass('password > ')
     server = Server(href=settings['SERVER'],
@@ -727,12 +737,10 @@ def main():
                 pargs.force = True
         if pargs.force:
             db.destroy()
-            if pargs.verbose:
-                print('deleted database', settings['DATABASE'])
+            verbosity(pargs, 'deleted database', settings['DATABASE'])
     if pargs.create:
         db = server.create(settings['DATABASE'])
-        if pargs.verbose:
-            print('created database', db)
+        verbosity(pargs, 'created database', db)
     if pargs.save:
         db = get_database(server, settings)
         try:
@@ -744,7 +752,7 @@ def main():
                     doc = json.load(infile,
                                     object_pairs_hook=collections.OrderedDict)
             except (IOError, ValueError, TypeError) as error:
-                sys.exit("error: {}".format(error))
+                sys.exit("Error: {}".format(error))
         db.save(doc)
         if pargs.verbose:
             print('saved doc', doc['_id'])
@@ -762,7 +770,7 @@ def main():
     if pargs.undump:
         db = get_database(server, settings)
         if len(db) != 0:
-            parser.error("database '{}' is not empty".format(db))
+            sys.exit("database '{}' is not empty".format(db))
         ndocs, nfiles = db.undump(pargs.undump)
         print(ndocs, 'documents,', nfiles, 'files undumped')
     if pargs.information:
@@ -772,6 +780,9 @@ def main():
 
 if __name__ == '__main__':
     try:
-        main()
+        parser = get_parser()
+        pargs = parser.parse_args()
+        settings = get_settings(pargs)
+        main(pargs, settings)
     except CouchDB2Exception as error:
-        sys.exit("error: {}".format(error))
+        sys.exit("Error: {}".format(error))

@@ -15,15 +15,23 @@ $ pip install [-e] git+https://github.com/pekrau/CouchDB2.git#egg=couchdb2
 
 Interact with the CouchDB server via the command line.
 
-Settings for the command line tool are read from these files (if existing),
-in order:
+Settings for the command line tool are updated in order from the following
+sources (if existing):
 
-1) Default for `SERVER` is `http://localhost:5984`.
-2) JSON file `~/.couchdb2`
-3) JSON file `settings.json` (in current working directory).
-4) JSON file `--settings file`, if any given.
+1) Defaults are
+   ```
+   {
+     "SERVER": "http://localhost:5984",
+     "DATABASE": null,
+     "USERNAME": null,
+     "PASSWORD": null
+   }
+   ```
+2) From JSON file `~/.couchdb2`
+3) From JSON file `settings.json` (in the current working directory).
+4) From JSON file `--settings file`, if given.
 
-View the available command options using:
+View all available command options by:
 
 ```
 $ python couchdb2.py -h
@@ -235,7 +243,7 @@ Example of doc:
 
 More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
 
-- Raises AuthorizationError if not privileged to read.
+- Raises AuthorizationError if not privileged to write.
 - Raise NotFoundError if no such database.
 - Raises IOError if something else went wrong.
 
