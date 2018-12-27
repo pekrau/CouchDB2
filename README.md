@@ -142,6 +142,11 @@ Delete this database and all its contents.
 - Raises NotFoundError if no such database.
 - Raises IOError if there is some other error.
 
+### get_ifno
+```python
+db.get_info()
+```
+Return a dictionary containing information about the database.
 ### compact
 ```python
 db.compact()

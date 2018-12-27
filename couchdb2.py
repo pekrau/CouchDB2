@@ -5,13 +5,16 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.0.3'
+__version__ = '1.1.0'
 
+import argparse
 import collections
-from collections import OrderedDict
+import getpass
 import io
 import json
 import mimetypes
+import os.path
+import sys
 import tarfile
 import uuid
 
@@ -197,7 +200,7 @@ class Database(object):
     def check(self):
         "- Raises NotFoundError if this database does not exist."
         if not self.exists():
-            raise NotFoundError('database does not exist')
+            raise NotFoundError("database '{}' does not exist".format(self))
 
     def create(self):
         """Create this database.
@@ -216,6 +219,10 @@ class Database(object):
         - Raises IOError if there is some other error.
         """
         self.server._DELETE(self.name)
+
+    def get_info(self):
+        "Return a dictionary containing information about the database."
+        return self.server._GET(self.name).json()
 
     def compact(self):
         "Compact the database on disk. May take some time."
@@ -242,7 +249,7 @@ class Database(object):
                                     errors={404: None}, params=params)
         if response.status_code == 404:
             return default
-        return response.json(object_pairs_hook=OrderedDict)
+        return response.json(object_pairs_hook=collections.OrderedDict)
 
     def save(self, doc):
         """Insert or update the document.
@@ -419,7 +426,7 @@ class Database(object):
         if update is not None:
             data['update'] = update
         response = self.server._POST(self.name, '_find', json=data)
-        return response.json(object_pairs_hook=OrderedDict)
+        return response.json(object_pairs_hook=collections.OrderedDict)
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
         """'content' is a string or a file-like object.
@@ -504,7 +511,8 @@ class Database(object):
                     self.put_attachment(doc, itemdata, **atts.pop(item.name))
                     nfiles += 1
                 else:
-                    doc = json.loads(itemdata)
+                    doc = json.loads(itemdata, 
+                                     object_pairs_hook=collections.OrderedDict)
                     doc.pop('_rev', None)
                     atts = doc.pop('_attachments', dict())
                     self.save(doc)
@@ -590,6 +598,169 @@ _ERRORS = {
     500: ServerError('internal server error')}
 
 
+def get_parser():
+    "Get the parser for the command line tool."
+    p = argparse.ArgumentParser(description='CouchDB2 command line tool')
+    p.add_argument('-v', '--verbose', action='store_true',
+                   help='more verbose information')
+    p.add_argument('-S', '--settings', default='~/.couchdb2',
+                   help='settings file in JSON format (default ~/.couchdb2)')
+    p.add_argument('-s', '--server', help='server URL, including port number')
+    p.add_argument('-d', '--database', help='database to use')
+    p.add_argument('-u', '--username', help='user name')
+    p.add_argument('-p', '--password', help='password')
+    p.add_argument('-P', '--interactive_password', action='store_true',
+                   help='ask for the password by interactive input')
+    p.add_argument('-V', '--version', action='store_true',
+                   help='output CouchDB server version')
+    p.add_argument('-L', '--list', action='store_true',
+                   help='list the databases on the server')
+    p.add_argument('-i', '--information', action='store_true',
+                   help='output information about the database')
+    p.add_argument('-X', '--delete', action='store_true',
+                   help='delete the database')
+    p.add_argument('-f', '--force', action='store_true',
+                   help='do not ask for interactive confirmation')
+    p.add_argument('-C', '--create', action='store_true',
+                   help='create the database')
+    p.add_argument('-c', '--dump', metavar='FILENAME',
+                   help='create a dump file for the database')
+    p.add_argument('-x', '--undump', metavar='FILENAME',
+                   help='load a dump file into the database')
+    p.add_argument('-a', '--save', metavar="FILENAME_OR_DOC",
+                   help='save the document (file or explicit) in the database')
+    p.add_argument('-g', '--get', metavar="ID",
+                   help='get the document with the given identifier')
+    return p
+
+
+DEFAULT_SETTINGS = {
+    'SERVER': 'http://localhost:5984',
+    'DATABASE': None,
+    'USERNAME': None,
+    'PASSWORD': None
+}
+
+def get_settings(pargs):
+    """Get the settings lookup.
+    1) Initialize with default settings.
+    2) Update with values in the settings file (if any).
+    3) Modify by any command line arguments.
+    """
+    settings = DEFAULT_SETTINGS.copy()
+    if pargs.settings:
+        try:
+            with open(os.path.expanduser(pargs.settings), 'r') as infile:
+                settings.update(json.load(infile))
+            if pargs.verbose:
+                print('settings from file', pargs.settings)
+            for key in ['COUCHDB_SERVER', 'COUCHDB2_SERVER']:
+                try:
+                    settings['SERVER'] = settings[key]
+                except KeyError:
+                    pass
+            for key in ['COUCHDB_DATABASE', 'COUCHDB2_DATABASE']:
+                try:
+                    settings['DATABASE'] = settings[key]
+                except KeyError:
+                    pass
+            for key in ['COUCHDB_USER', 'COUCHDB2_USER', 
+                        'COUCHDB_USERNAME', 'COUCHDB2_USERNAME']:
+                try:
+                    settings['USERNAME'] = settings[key]
+                except KeyError:
+                    pass
+            for key in ['COUCHDB_PASSWORD', 'COUCHDB2_PASSWORD']:
+                try:
+                    settings['PASSWORD'] = settings[key]
+                except KeyError:
+                    pass
+        except IOError:
+            if pargs.verbose:
+                print('Warning: could not read settings file', pargs.settings)
+    if pargs.server:
+        settings['SERVER'] = pargs.server
+    if pargs.database:
+        settings['DATABASE'] = pargs.database
+    if pargs.username:
+        settings['USERNAME'] = pargs.username
+    if pargs.password:
+        settings['PASSWORD'] = pargs.password
+    return settings
+
+def get_database(server, settings):
+    if not settings['DATABASE']:
+        sys.exit('error: no database defined')
+    return server[settings['DATABASE']]
+
+def main():
+    "CouchDB2 command line tool."
+    try:
+        input = raw_input
+    except NameError:
+        pass
+    parser = get_parser()
+    pargs = parser.parse_args()
+    settings = get_settings(pargs)
+    if pargs.interactive_password:
+        settings['PASSWORD'] = getpass.getpass('password > ')
+    server = Server(href=settings['SERVER'],
+                    username=settings['USERNAME'],
+                    password=settings['PASSWORD'])
+    if pargs.version:
+        print(server.version)
+    if pargs.list:
+        for db in server:
+            print(db)
+    if pargs.delete:
+        db = get_database(server, settings)
+        if not pargs.force:
+            answer = input("really delete database '{}'? [n] > ".format(db))
+            if answer and answer.lower()[0] in ('y', 't'):
+                pargs.force = True
+        if pargs.force:
+            db.destroy()
+            if pargs.verbose:
+                print('deleted database', settings['DATABASE'])
+    if pargs.create:
+        db = server.create(settings['DATABASE'])
+        if pargs.verbose:
+            print('created database', db)
+    if pargs.save:
+        db = get_database(server, settings)
+        try:
+            doc = json.loads(pargs.save,
+                             object_pairs_hook=collections.OrderedDict)
+        except (ValueError, TypeError):
+            try:
+                with open(pargs.save, 'rb') as infile:
+                    doc = json.load(infile,
+                                    object_pairs_hook=collections.OrderedDict)
+            except (IOError, ValueError, TypeError) as error:
+                sys.exit("error: {}".format(error))
+        db.save(doc)
+        if pargs.verbose:
+            print('saved doc', doc['_id'])
+    if pargs.get:
+        db = get_database(server, settings)
+        print(json.dumps(db[pargs.get], indent=2))
+    if pargs.dump:
+        db = get_database(server, settings)
+        ndocs, nfiles = db.dump(pargs.dump)
+        print(ndocs, 'documents,', nfiles, 'files dumped')
+    if pargs.undump:
+        db = get_database(server, settings)
+        if len(db) != 0:
+            parser.error("database '{}' is not empty".format(db))
+        ndocs, nfiles = db.undump(pargs.undump)
+        print(ndocs, 'documents,', nfiles, 'files undumped')
+    if pargs.information:
+        db = get_database(server, settings)
+        print(json.dumps(db.get_info(), indent=2))
+
+
 if __name__ == '__main__':
-    server = Server()
-    print(json.dumps(server.get_config(), indent=2))
+    try:
+        main()
+    except CouchDB2Exception as error:
+        sys.exit("error: {}".format(error))
