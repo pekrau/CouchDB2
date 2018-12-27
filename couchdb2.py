@@ -603,8 +603,8 @@ def get_parser():
     p = argparse.ArgumentParser(description='CouchDB2 command line tool')
     p.add_argument('-v', '--verbose', action='store_true',
                    help='more verbose information')
-    p.add_argument('-S', '--settings', default='~/.couchdb2',
-                   help='settings file in JSON format (default ~/.couchdb2)')
+    p.add_argument('-S', '--settings',
+                   help='settings file in JSON format')
     p.add_argument('-s', '--server', help='server URL, including port number')
     p.add_argument('-d', '--database', help='database to use')
     p.add_argument('-u', '--username', help='user name')
@@ -613,24 +613,26 @@ def get_parser():
                    help='ask for the password by interactive input')
     p.add_argument('-V', '--version', action='store_true',
                    help='output CouchDB server version')
-    p.add_argument('-L', '--list', action='store_true',
+    p.add_argument('-l', '--list', action='store_true',
                    help='list the databases on the server')
-    p.add_argument('-i', '--information', action='store_true',
-                   help='output information about the database')
-    p.add_argument('-X', '--delete', action='store_true',
+    p.add_argument('-c', '--create', action='store_true',
+                   help='create the database')
+    p.add_argument('-x', '--delete', action='store_true',
                    help='delete the database')
     p.add_argument('-f', '--force', action='store_true',
                    help='do not ask for interactive confirmation')
-    p.add_argument('-C', '--create', action='store_true',
-                   help='create the database')
-    p.add_argument('-c', '--dump', metavar='FILENAME',
-                   help='create a dump file for the database')
-    p.add_argument('-x', '--undump', metavar='FILENAME',
-                   help='load a dump file into the database')
+    p.add_argument('-i', '--information', action='store_true',
+                   help='output information about the database')
     p.add_argument('-a', '--save', metavar="FILENAME_OR_DOC",
                    help='save the document (file or explicit) in the database')
     p.add_argument('-g', '--get', metavar="ID",
-                   help='get the document with the given identifier')
+                   help='output the document with the given identifier')
+    p.add_argument('-G', '--getfile', metavar="ID",
+                   help='write the document with the given identifier to a file')
+    p.add_argument('--dump', metavar='FILENAME',
+                   help='create a dump file for the database')
+    p.add_argument('--undump', metavar='FILENAME',
+                   help='load a dump file into the database')
     return p
 
 
@@ -641,43 +643,48 @@ DEFAULT_SETTINGS = {
     'PASSWORD': None
 }
 
-def get_settings(pargs):
+def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
     """Get the settings lookup.
     1) Initialize with default settings.
-    2) Update with values in the settings file (if any).
-    3) Modify by any command line arguments.
+    2) Update with values in JSON file '~/.couchdb2', if any.
+    3) Update with values in JSON file 'settings.json' (current dir), if any.
+    4) Update with values in the explicitly given settings file, if any.
+    5) Modify by any command line arguments.
     """
     settings = DEFAULT_SETTINGS.copy()
+    filepaths = filepaths[:]
     if pargs.settings:
+        filepaths.append(pargs.settings)
+    for filepath in filepaths:
         try:
-            with open(os.path.expanduser(pargs.settings), 'r') as infile:
+            with open(os.path.expanduser(filepath), 'rb') as infile:
                 settings.update(json.load(infile))
             if pargs.verbose:
-                print('settings from file', pargs.settings)
-            for key in ['COUCHDB_SERVER', 'COUCHDB2_SERVER']:
-                try:
-                    settings['SERVER'] = settings[key]
-                except KeyError:
-                    pass
-            for key in ['COUCHDB_DATABASE', 'COUCHDB2_DATABASE']:
-                try:
-                    settings['DATABASE'] = settings[key]
-                except KeyError:
-                    pass
-            for key in ['COUCHDB_USER', 'COUCHDB2_USER', 
-                        'COUCHDB_USERNAME', 'COUCHDB2_USERNAME']:
-                try:
-                    settings['USERNAME'] = settings[key]
-                except KeyError:
-                    pass
-            for key in ['COUCHDB_PASSWORD', 'COUCHDB2_PASSWORD']:
-                try:
-                    settings['PASSWORD'] = settings[key]
-                except KeyError:
-                    pass
+                print('settings from file', filepath)
         except IOError:
             if pargs.verbose:
                 print('Warning: could not read settings file', pargs.settings)
+    for key in ['COUCHDB_SERVER', 'COUCHDB2_SERVER']:
+        try:
+            settings['SERVER'] = settings[key]
+        except KeyError:
+            pass
+    for key in ['COUCHDB_DATABASE', 'COUCHDB2_DATABASE']:
+        try:
+            settings['DATABASE'] = settings[key]
+        except KeyError:
+            pass
+    for key in ['COUCHDB_USER', 'COUCHDB2_USER', 
+                'COUCHDB_USERNAME', 'COUCHDB2_USERNAME']:
+        try:
+            settings['USERNAME'] = settings[key]
+        except KeyError:
+            pass
+    for key in ['COUCHDB_PASSWORD', 'COUCHDB2_PASSWORD']:
+        try:
+            settings['PASSWORD'] = settings[key]
+        except KeyError:
+            pass
     if pargs.server:
         settings['SERVER'] = pargs.server
     if pargs.database:
@@ -744,6 +751,10 @@ def main():
     if pargs.get:
         db = get_database(server, settings)
         print(json.dumps(db[pargs.get], indent=2))
+    elif pargs.getfile:
+        db = get_database(server, settings)
+        with open(pargs.getfile + '.json', 'wb') as outfile:
+            json.dump(db[pargs.getfile], outfile, indent=2)
     if pargs.dump:
         db = get_database(server, settings)
         ndocs, nfiles = db.dump(pargs.dump)

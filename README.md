@@ -8,7 +8,25 @@ Relies on `requests`: http://docs.python-requests.org/en/master/
 
 Quick-and-dirty method, since this module is not yet on PyPi:
 ```
-pip install [-e] git+https://github.com/pekrau/CouchDB2.git#egg=couchdb2
+$ pip install [-e] git+https://github.com/pekrau/CouchDB2.git#egg=couchdb2
+```
+
+## Command line tool
+
+Interact with the CouchDB server via the command line.
+
+Settings for the command line tool are read from these files (if existing),
+in order:
+
+1) Default for `SERVER` is `http://localhost:5984`.
+2) JSON file `~/.couchdb2`
+3) JSON file `settings.json` (in current working directory).
+4) JSON file `--settings file`, if any given.
+
+View the available command options using:
+
+```
+$ python couchdb2.py -h
 ```
 
 ## Server
