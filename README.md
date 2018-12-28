@@ -168,7 +168,7 @@ Delete this database and all its contents.
 - Raises NotFoundError if no such database.
 - Raises IOError if there is some other error.
 
-### get_ifno
+### get_info
 ```python
 db.get_info()
 ```
@@ -254,9 +254,7 @@ db.view(designname, viewname, key=None, keys=None, startkey=None, endkey=None,
         group=False, group_level=None, reduce=None,
         include_docs=False)
 ```
-Return the selected rows from the named design view.
-
-A [ViewResult](#viewresult) object is returned, containing
+Return a [ViewResult](#viewresult) object, containing
 [Row](#row) objects in the list attribute `rows`.
 
 ### load_index

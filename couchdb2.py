@@ -330,9 +330,7 @@ class Database(object):
              skip=None, limit=None, sorted=True, descending=False,
              group=False, group_level=None, reduce=None,
              include_docs=False):
-        """Return the selected rows from the named design view.
-
-        A ViewResult object is returned, containing the following attributes:
+        """Return a ViewResult object, containing the following attributes:
         - `rows`: the list of Row objects.
         - `offset`: the offset used for this set of rows.
         - `total_rows`: the total number of rows selected.
