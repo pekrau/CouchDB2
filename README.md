@@ -295,7 +295,8 @@ and 'bookmark'.
 ```python
 db.put_attachment(doc, content, filename=None, content_type=None)
 ```
-'content' is a string or a file-like object.
+'content' is a string or a file-like object. Return the new revision
+of the document.
 
 If no filename, then an attempt is made to get it from content object.
 
@@ -306,12 +307,19 @@ If no filename, then an attempt is made to get it from content object.
 db.get_attachment(doc, filename)
 ```
 Return a file-like object containing the content of the attachment.
+
+### delete_attachment
+```python
+db.delete_attachment(doc, filename)
+```
+Delete the attachment. Return the new revision of the document.
+
 ### dump
 ```python
 db.dump(filepath)
 ```
 Dump the entire database to the named tar file.
-If the filepath ends with '.gz', the tar file is gzip compressed.
+If the filepath ends with '.gz', then the tar file is gzip compressed.
 
 The `_rev` item of each document is kept.
 

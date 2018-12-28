@@ -466,7 +466,7 @@ class Database(object):
 
     def dump(self, filepath):
         """Dump the entire database to the named tar file.
-        If the filepath ends with '.gz', the tar file is gzip compressed.
+        If the filepath ends with '.gz', then the tar file is gzip compressed.
 
         The `_rev` item of each document is kept.
 
