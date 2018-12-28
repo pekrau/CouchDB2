@@ -618,7 +618,7 @@ def get_parser():
     p.add_argument('-J', '--jsonindent', type=int, metavar='INT',
                    help='indentation level for JSON format output file')
     p.add_argument('-f', '--force', action='store_true',
-                   help='do not ask for interactive confirmation for delete')
+                   help='do not ask for interactive confirmation (delete, destroy)')
 
     g0 = p.add_argument_group('server operations')
     g0.add_argument('-V', '--version', action='store_true',
@@ -663,13 +663,27 @@ def get_parser():
     g4 = p.add_argument_group('query a design view, returning rows')
     g4.add_argument('--view', metavar="SPEC",
                     help="design view '{design}/{view}' to query")
-    x4 = g4.add_mutually_exclusive_group()
-    x4.add_argument('--key', metavar="KEY",
+    x41 = g4.add_mutually_exclusive_group()
+    x41.add_argument('--key', metavar="KEY",
                     help="key value selecting view rows")
-    x4.add_argument('--startkey', metavar="KEY",
+    x41.add_argument('--startkey', metavar="KEY",
                     help="start key value selecting range of view rows")
     g4.add_argument('--endkey', metavar="KEY",
                     help="end key value selecting range of view rows")
+    g4.add_argument('--startkey_docid', metavar="DOCID",
+                    help='return rows starting with the specified document')
+    g4.add_argument('--endkey_docid', metavar="DOCID",
+                    help='stop returning rows when specified document reached')
+    g4.add_argument('--group', action='store_true',
+                     help="group the results using the 'reduce' function")
+    g4.add_argument('--group_level', type=int, metavar='INT',
+                     help='specify the group level to use')
+    g4.add_argument('--noreduce', action='store_true',
+                     help="do not use the 'reduce' function of the view")
+    g4.add_argument('--limit', type=int, metavar='INT',
+                    help='limit the number of returned rows')
+    g4.add_argument('--skip', type=int, metavar='INT',
+                    help='skip this number of rows before returning result')
     g4.add_argument('--descending', action='store_true',
                     help='sort rows in descending order (swap start/end keys!)')
     g4.add_argument('--include_docs', action='store_true',
@@ -700,7 +714,7 @@ def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
         try:
             with open(os.path.expanduser(filepath), 'rb') as infile:
                 settings.update(json.load(infile))
-            verbosity(pargs, 'settings from file', filepath)
+            verbosity(pargs, 'settings read from file', filepath)
         except IOError:
             verbosity(pargs, 'Warning: could not read settings file', filepath)
     for key in ['COUCHDB_SERVER', 'COUCHDB2_SERVER']:
@@ -830,7 +844,7 @@ def main(pargs, settings):
         id = doc.get('_id')
         db.save(doc)
         if id:
-            verbosity('saved doc', doc['_id'])
+            verbosity(pargs, 'saved doc', doc['_id'])
         else:
             print('saved doc', doc['_id'])
     elif pargs.get:
@@ -838,7 +852,8 @@ def main(pargs, settings):
         if not to_json(pargs, doc):
             print(json.dumps(doc, indent=2))
     elif pargs.delete:
-        doc = get_database(server, settings)[pargs.delete]
+        db = get_database(server, settings)
+        doc = db[pargs.delete]
         db.delete(doc)
         verbosity(pargs, 'deleted doc', doc['_id'])
 
@@ -848,11 +863,15 @@ def main(pargs, settings):
         except ValueError:
             sys.exit('Error: invalid view specification')
         kwargs = {}
-        for key in ('key', 'startkey', 'endkey', 'descending', 'include_docs'):
+        for key in ('key', 
+                    'startkey', 'endkey', 'startkey_docid', 'endkey_docid',
+                    'group', 'group_level', 'limit', 'skip',
+                    'descending', 'include_docs'):
             value = getattr(pargs, key)
             if value is not None:
                 kwargs[key] = value
-        print(kwargs)
+        if pargs.noreduce:
+            kwargs['reduce'] = False
         result = get_database(server, settings).view(design, view, **kwargs)
         data = collections.OrderedDict()
         data['total_rows'] = result.total_rows
