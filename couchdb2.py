@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.2.0'
+__version__ = '1.3.0'
 
 import argparse
 import collections
@@ -621,9 +621,9 @@ def get_parser():
     p.add_argument('-p', '--password', help='CouchDB user account password')
     p.add_argument('-P', '--interactive_password', action='store_true',
                    help='ask for the password by interactive input')
-    p.add_argument('-j', '--json', metavar='FILEPATH',
-                   help='write output in JSON format to the given file')
-    p.add_argument('-J', '--jsonindent', type=int, metavar='INT',
+    p.add_argument('-o', '--output', metavar='FILEPATH',
+                   help='write output to the given file (usually JSON format)')
+    p.add_argument('--indent', type=int, metavar='INT',
                    help='indentation level for JSON format output file')
     p.add_argument('-f', '--force', action='store_true',
                    help='do not ask for interactive confirmation (delete, destroy)')
@@ -659,14 +659,15 @@ def get_parser():
     x2.add_argument('--delete', metavar="DOCID", # XXX
                     help='delete the document with the given identifier')
 
-    g3 = p.add_argument_group('attachments to document') # XXX
+    g3 = p.add_argument_group('attachments to document')
     x3 = g3.add_mutually_exclusive_group()
     x3.add_argument('--attach', nargs=2, metavar=('DOCID', 'FILEPATH'),
                     help='attach the specified file to the given document')
-    x3.add_argument('--detach', nargs=2, metavar=('DOCID', 'FILEPATH'),
+    x3.add_argument('--detach', nargs=2, metavar=('DOCID', 'FILENAME'),
                     help='remove the attached file from the given document')
-    x3.add_argument('--getfile', nargs=2, metavar=('DOCID', 'FILEPATH'),
-                    help='get the attached file from the given document')
+    x3.add_argument('--getfile', nargs=2, metavar=('DOCID', 'FILENAME'),
+                    help='get the attached file from the given document;'
+                    " write to same filepath or that given by '-o'")
 
     g4 = p.add_argument_group('query a design view, returning rows')
     g4.add_argument('--view', metavar="SPEC",
@@ -776,19 +777,19 @@ def verbosity(pargs, *args):
     print(*args)
 
 def to_json(pargs, data):
-    """If '-j'/'--json' was used, write the data in JSON format to the file.
-    The indentation level is set by '-J'/'--jsonindent'.
+    """If '--output' was used, write the data in JSON format to the file.
+    The indentation level is set by '--indent'.
     If the filepath ends in '.gz'. then a gzipped file is produced.
     """
-    if pargs.json:
-        if pargs.json.endswith('.gz'):
-            with gzip.open(pargs.json, 'wb') as outfile:
-                json.dump(data, outfile, indent=pargs.jsonindent)
+    if pargs.output:
+        if pargs.output.endswith('.gz'):
+            with gzip.open(pargs.output, 'wb') as outfile:
+                json.dump(data, outfile, indent=pargs.indent)
         else:
-            with open(pargs.json, 'wb') as outfile:
-                json.dump(data, outfile, indent=pargs.jsonindent)
-        verbosity(pargs, 'wrote to file', pargs.json)
-    return bool(pargs.json)
+            with open(pargs.output, 'wb') as outfile:
+                json.dump(data, outfile, indent=pargs.indent)
+        verbosity(pargs, 'wrote to file', pargs.output)
+    return bool(pargs.output)
 
 def main(pargs, settings):
     "CouchDB2 command line tool."
@@ -864,6 +865,29 @@ def main(pargs, settings):
         doc = db[pargs.delete]
         db.delete(doc)
         verbosity(pargs, 'deleted doc', doc['_id'])
+
+    if pargs.attach:
+        db = get_database(server, settings)
+        doc = db[pargs.attach[0]]
+        with open(pargs.attach[1], 'rb') as infile:
+            db.put_attachment(doc, infile)
+        verbosity(pargs, 
+                  "attached file '{1}' to doc '{0}'".format(*pargs.attach))
+    elif pargs.detach:
+        db = get_database(server, settings)
+        doc = db[pargs.detach[0]]
+        db.delete_attachment(doc, pargs.detach[1])
+        verbosity(pargs,
+                  "detached file '{1}' from doc '{0}'".format(*pargs.detach))
+    elif pargs.getfile:
+        db = get_database(server, settings)
+        doc = db[pargs.getfile[0]]
+        filepath = pargs.output or pargs.getfile[1]
+        with open(filepath, 'wb') as outfile:
+            outfile.write(db.get_attachment(doc, pargs.getfile[1]).read())
+        verbosity(pargs,
+                  "wrote file '{0}' from doc '{1}' attachment '{2}'".
+                  format(filepath, *pargs.getfile))
 
     if pargs.view:
         try:
