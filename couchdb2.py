@@ -431,7 +431,8 @@ class Database(object):
         return response.json(object_pairs_hook=collections.OrderedDict)
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
-        """'content' is a string or a file-like object.
+        """'content' is a string or a file-like object. Return the new
+        revision of the document.
 
         If no filename, then an attempt is made to get it from content object.
 
@@ -449,12 +450,19 @@ class Database(object):
                                     data=content,
                                     headers={'Content-Type': content_type,
                                              'If-Match': doc['_rev']})
+        return response.json()['rev']
 
     def get_attachment(self, doc, filename):
         "Return a file-like object containing the content of the attachment."
         response = self.server._GET(self.name, doc['_id'], filename,
                                     headers={'If-Match': doc['_rev']})
         return io.BytesIO(response.content)
+
+    def delete_attachment(self, doc, filename):
+        "Delete the attachment. Return the new revision of the document."
+        response = self.server._DELETE(self.name, doc['_id'], filename,
+                                       headers={'If-Match': doc['_rev']})
+        return response.json()['rev']
 
     def dump(self, filepath):
         """Dump the entire database to the named tar file.
