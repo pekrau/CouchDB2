@@ -256,16 +256,8 @@ db.view(designname, viewname, key=None, keys=None, startkey=None, endkey=None,
 ```
 Return the selected rows from the named design view.
 
-A `ViewResult` object is returned, containing the following attributes:
-- `rows`: the list of `Row` objects.
-- `offset`: the offset used for this set of rows.
-- `total_rows`: the total number of rows selected.
-
-A `Row` object contains the following attributes:
-- `id`: the identifier of the document, if any.
-- `key`: the key for the index row.
-- `value`: the value for the index row.
-- `doc`: the document, if any.
+A [ViewResult](#viewresult) object is returned, containing
+[Row](#row) objects in the list attribute `rows`.
 
 ### load_index
 ```python
@@ -338,51 +330,57 @@ A tuple `(ndocs, nfiles)` is returned.
 
 ## CouchDB2Exception
 ```python
-CouchDB2Exception(self)
+CouchDB2Exception()
 ```
 Base CouchDB2 exception.
 ## NotFoundError
 ```python
-NotFoundError(self)
+NotFoundError()
 ```
 No such entity exists.
 ## BadRequestError
 ```python
-BadRequestError(self)
+BadRequestError()
 ```
 Invalid request; bad name, body or headers.
 ## CreationError
 ```python
-CreationError(self)
+CreationError()
 ```
 Could not create the entity; it exists already.
 ## RevisionError
 ```python
-RevisionError(self)
+RevisionError()
 ```
 Wrong or missing '_rev' item in the document to save.
 ## AuthorizationError
 ```python
-AuthorizationError(self)
+AuthorizationError()
 ```
 Current user not authorized to perform the operation.
 ## ContentTypeError
 ```python
-ContentTypeError(self)
+ContentTypeError()
 ```
 Bad 'Content-Type' value in the request.
 ## ServerError
 ```python
-ServerError(self)
+ServerError()
 ```
 Internal server error.
 ## Row
 
-Named tuple object returned in ViewResult `rows`.
+Named tuple object returned in ViewResult list attribute `rows`.
 
 ```python
 Row(id, key, value, doc)
 ```
+
+- `id`: the identifier of the document, if any.
+- `key`: the key for the index row.
+- `value`: the value for the index row.
+- `doc`: the document, if any.
+
 ### id
 Alias for field number 0
 ### key
@@ -391,6 +389,7 @@ Alias for field number 1
 Alias for field number 2
 ### doc
 Alias for field number 3
+
 ## ViewResult
 
 Named tuple object returned as result from `db.view()`.
@@ -398,6 +397,10 @@ Named tuple object returned as result from `db.view()`.
 ```python
 ViewResult(rows, offset, total_rows)
 ```
+- `rows`: the list of `Row` objects.
+- `offset`: the offset used for this set of rows.
+- `total_rows`: the total number of rows selected.
+
 ### rows
 Contains the rows found: list of `Row` objects.
 

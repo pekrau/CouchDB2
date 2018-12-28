@@ -5,17 +5,19 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.1.3'
+__version__ = '1.2.0'
 
 import argparse
 import collections
 import getpass
+import gzip
 import io
 import json
 import mimetypes
 import os.path
 import sys
 import tarfile
+import time
 import uuid
 
 import requests
@@ -146,7 +148,7 @@ class Server(object):
             except KeyError:
                 raise IOError("{r.status_code} {r.reason}".format(r=response))
         if error is not None:
-            raise error
+            raise error(response.reason)
 
 
 class Database(object):
@@ -330,12 +332,12 @@ class Database(object):
              include_docs=False):
         """Return the selected rows from the named design view.
 
-        A #ViewResult object is returned, containing the following attributes:
-        - `rows`: the list of #Row objects.
+        A ViewResult object is returned, containing the following attributes:
+        - `rows`: the list of Row objects.
         - `offset`: the offset used for this set of rows.
         - `total_rows`: the total number of rows selected.
 
-        A #Row object contains the following attributes:
+        A Row object contains the following attributes:
         - `id`: the identifier of the document, if any.
         - `key`: the key for the index row.
         - `value`: the value for the index row.
@@ -588,51 +590,90 @@ _ERRORS = {
     201: None,
     202: None,
     304: None,
-    400: BadRequestError('bad name, request body or parameters'),
-    401: AuthorizationError('insufficient privilege'),
-    403: AuthorizationError('insufficient privilege'),
-    404: NotFoundError('no such entity'),
-    409: RevisionError("missing or incorrect '_rev' item"),
-    412: CreationError('name already in use'),
-    415: ContentTypeError("bad 'Content-Type' value"),
-    500: ServerError('internal server error')}
+    400: BadRequestError,
+    401: AuthorizationError,
+    403: AuthorizationError,
+    404: NotFoundError,
+    409: RevisionError,
+    412: CreationError,
+    415: ContentTypeError,
+    500: ServerError}
 
 
 def get_parser():
     "Get the parser for the command line tool."
     p = argparse.ArgumentParser(description='CouchDB2 command line tool')
     p.add_argument('-v', '--verbose', action='store_true',
-                   help='more verbose information')
+                   help='print more information')
     p.add_argument('-S', '--settings',
                    help='settings file in JSON format')
     p.add_argument('-s', '--server', help='server URL, including port number')
-    p.add_argument('-d', '--database', help='database to use')
-    p.add_argument('-u', '--username', help='user name')
-    p.add_argument('-p', '--password', help='password')
+    p.add_argument('-d', '--database', help='database to operate on')
+    p.add_argument('-u', '--username', help='CouchDB user account name')
+    p.add_argument('-p', '--password', help='CouchDB user account password')
     p.add_argument('-P', '--interactive_password', action='store_true',
                    help='ask for the password by interactive input')
-    p.add_argument('-o', '--output', metavar='FILEPATH',
-                   help='write the output in JSON format to the given file')
-    p.add_argument('-V', '--version', action='store_true',
-                   help='output CouchDB server version')
-    p.add_argument('-l', '--list', action='store_true',
-                   help='output a list of the databases on the server')
-    p.add_argument('-c', '--create', action='store_true',
-                   help='create the database')
-    p.add_argument('-x', '--delete', action='store_true',
-                   help='delete the database')
+    p.add_argument('-j', '--json', metavar='FILEPATH',
+                   help='write output in JSON format to the given file')
+    p.add_argument('-J', '--jsonindent', type=int, metavar='INT',
+                   help='indentation level for JSON format output file')
     p.add_argument('-f', '--force', action='store_true',
-                   help='do not ask for interactive confirmation')
-    p.add_argument('-i', '--information', action='store_true',
-                   help='output information about the database')
-    p.add_argument('-a', '--save', metavar='FILEPATH_OR_DOC',
-                   help='save the document (from file or explicit)')
-    p.add_argument('-g', '--get', metavar="DOCID",
-                   help='output the document with the given identifier')
-    p.add_argument('--dump', metavar='FILENAME',
-                   help='create a dump file for the database')
-    p.add_argument('--undump', metavar='FILENAME',
-                   help='load a dump file into the database')
+                   help='do not ask for interactive confirmation for delete')
+
+    g0 = p.add_argument_group('server operations')
+    g0.add_argument('-V', '--version', action='store_true',
+                    help='output CouchDB server version')
+    g0.add_argument('--list', action='store_true',
+                    help='output a list of the databases on the server')
+
+    g1 = p.add_argument_group('database operations')
+    g1.add_argument('--info', action='store_true',
+                     help='output information about the database')
+    x11 = g1.add_mutually_exclusive_group()
+    x11.add_argument('--create', action='store_true',
+                     help='create the database')
+    x11.add_argument('--destroy', action='store_true',
+                     help='delete the database and all its contents')
+    x11.add_argument('--compact', action='store_true',
+                     help='compact the database; may take some time')
+    x12 = g1.add_mutually_exclusive_group()
+    x12.add_argument('--dump', metavar='FILEPATH',
+                     help='create a dump file of the database')
+    x12.add_argument('--undump', metavar='FILEPATH',
+                     help='load a dump file into the database')
+
+    g2 = p.add_argument_group('document operations')
+    x2 = g2.add_mutually_exclusive_group()
+    x2.add_argument('--save', metavar='DOC_OR_FILEPATH',
+                    help='save the document (from file or explicit)')
+    x2.add_argument('--get', metavar="DOCID",
+                    help='output the document with the given identifier')
+    x2.add_argument('--delete', metavar="DOCID", # XXX
+                    help='delete the document with the given identifier')
+
+    g3 = p.add_argument_group('attachments to document') # XXX
+    x3 = g3.add_mutually_exclusive_group()
+    x3.add_argument('--attach', nargs=2, metavar=('DOCID', 'FILEPATH'),
+                    help='attach the specified file to the given document')
+    x3.add_argument('--detach', nargs=2, metavar=('DOCID', 'FILEPATH'),
+                    help='remove the attached file from the given document')
+    x3.add_argument('--getfile', nargs=2, metavar=('DOCID', 'FILEPATH'),
+                    help='get the attached file from the given document')
+
+    g4 = p.add_argument_group('query a design view, returning rows')
+    g4.add_argument('--view', metavar="SPEC",
+                    help="design view '{design}/{view}' to query")
+    x4 = g4.add_mutually_exclusive_group()
+    x4.add_argument('--key', metavar="KEY",
+                    help="key value selecting view rows")
+    x4.add_argument('--startkey', metavar="KEY",
+                    help="start key value selecting range of view rows")
+    g4.add_argument('--endkey', metavar="KEY",
+                    help="end key value selecting range of view rows")
+    g4.add_argument('--descending', action='store_true',
+                    help='sort rows in descending order (swap start/end keys!)')
+    g4.add_argument('--include_docs', action='store_true',
+                    help='include documents in result')
     return p
 
 
@@ -708,8 +749,24 @@ def get_database(server, settings):
     return server[settings['DATABASE']]
 
 def verbosity(pargs, *args):
+    "If flag '--verbose' used, print the arguments."
     if not pargs.verbose: return
     print(*args)
+
+def to_json(pargs, data):
+    """If '-j'/'--json' was used, write the data in JSON format to the file.
+    The indentation level is set by '-J'/'--jsonindent'.
+    If the filepath ends in '.gz'. then a gzipped file is produced.
+    """
+    if pargs.json:
+        if pargs.json.endswith('.gz'):
+            with gzip.open(pargs.json, 'wb') as outfile:
+                json.dump(data, outfile, indent=pargs.jsonindent)
+        else:
+            with open(pargs.json, 'wb') as outfile:
+                json.dump(data, outfile, indent=pargs.jsonindent)
+        verbosity(pargs, 'wrote to file', pargs.json)
+    return bool(pargs.json)
 
 def main(pargs, settings):
     "CouchDB2 command line tool."
@@ -723,56 +780,95 @@ def main(pargs, settings):
                     username=settings['USERNAME'],
                     password=settings['PASSWORD'])
     if pargs.version:
-        print(server.version)
+        if not to_json(pargs, server.version):
+            print(server.version)
     if pargs.list:
-        for db in server:
-            print(db)
-    if pargs.delete:
+        dbs = list(server)
+        if not to_json(pargs, [str(db) for db in dbs]):
+            for db in dbs:
+                print(db)
+
+    if pargs.info:
+        doc = get_database(server, settings).get_info()
+        if not to_json(pargs, doc):
+            print(json.dumps(db, indent=2))
+    elif pargs.create:
+        db = server.create(settings['DATABASE'])
+        verbosity(pargs, 'created database', db)
+    elif pargs.destroy:
         db = get_database(server, settings)
         if not pargs.force:
-            answer = input("really delete database '{}'? [n] > ".format(db))
+            answer = input("really destroy database '{}' [n] ? ".format(db))
             if answer and answer.lower()[0] in ('y', 't'):
                 pargs.force = True
         if pargs.force:
             db.destroy()
-            verbosity(pargs, 'deleted database', settings['DATABASE'])
-    if pargs.create:
-        db = server.create(settings['DATABASE'])
-        verbosity(pargs, 'created database', db)
+            verbosity(pargs, 'destroyed database', settings['DATABASE'])
+    elif pargs.compact:
+        db = get_database(server, settings)
+        db.compact()
+        print("compacting '{}'.".format(db), sep='', end='')
+        sys.stdout.flush()
+        while db.is_compact_running():
+            time.sleep(1)
+            print('.', sep='', end='')
+            sys.stdout.flush()
+        print()
+
     if pargs.save:
         db = get_database(server, settings)
-        try:
+        try:                    # Attempt to interpret arg as explicit doc
             doc = json.loads(pargs.save,
                              object_pairs_hook=collections.OrderedDict)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError): # Arg is filepath to doc
             try:
                 with open(pargs.save, 'rb') as infile:
                     doc = json.load(infile,
                                     object_pairs_hook=collections.OrderedDict)
             except (IOError, ValueError, TypeError) as error:
                 sys.exit("Error: {}".format(error))
+        id = doc.get('_id')
         db.save(doc)
-        print('saved doc', doc['_id'])
-    if pargs.get:
-        db = get_database(server, settings)
-        print(json.dumps(db[pargs.get], indent=2))
-    elif pargs.getfile:
-        db = get_database(server, settings)
-        with open(pargs.getfile + '.json', 'wb') as outfile:
-            json.dump(db[pargs.getfile], outfile, indent=2)
+        if id:
+            verbosity('saved doc', doc['_id'])
+        else:
+            print('saved doc', doc['_id'])
+    elif pargs.get:
+        doc = get_database(server, settings)[pargs.get]
+        if not to_json(pargs, doc):
+            print(json.dumps(doc, indent=2))
+    elif pargs.delete:
+        doc = get_database(server, settings)[pargs.delete]
+        db.delete(doc)
+        verbosity(pargs, 'deleted doc', doc['_id'])
+
+    if pargs.view:
+        try:
+            design, view = pargs.view.split('/')
+        except ValueError:
+            sys.exit('Error: invalid view specification')
+        kwargs = {}
+        for key in ('key', 'startkey', 'endkey', 'descending', 'include_docs'):
+            value = getattr(pargs, key)
+            if value is not None:
+                kwargs[key] = value
+        print(kwargs)
+        result = get_database(server, settings).view(design, view, **kwargs)
+        data = collections.OrderedDict()
+        data['total_rows'] = result.total_rows
+        data['offset'] = result.offset
+        data['rows'] = rows = [r._asdict() for r in result.rows]
+        if not to_json(pargs, data):
+            print(json.dumps(data, indent=2))
     if pargs.dump:
-        db = get_database(server, settings)
-        ndocs, nfiles = db.dump(pargs.dump)
-        print(ndocs, 'documents,', nfiles, 'files dumped')
-    if pargs.undump:
+        ndocs, nfiles = get_database(server, settings).dump(pargs.dump)
+        print('dumped', ndocs, 'documents,', nfiles, 'files')
+    elif pargs.undump:
         db = get_database(server, settings)
         if len(db) != 0:
             sys.exit("database '{}' is not empty".format(db))
         ndocs, nfiles = db.undump(pargs.undump)
-        print(ndocs, 'documents,', nfiles, 'files undumped')
-    if pargs.information:
-        db = get_database(server, settings)
-        print(json.dumps(db.get_info(), indent=2))
+        print('undumped', ndocs, 'documents,', nfiles, 'files')
 
 
 if __name__ == '__main__':
