@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.1.2'
+__version__ = '1.1.3'
 
 import argparse
 import collections
@@ -659,11 +659,9 @@ def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
         try:
             with open(os.path.expanduser(filepath), 'rb') as infile:
                 settings.update(json.load(infile))
-            if pargs.verbose:
-                print('settings from file', filepath)
+            verbosity(pargs, 'settings from file', filepath)
         except IOError:
-            if pargs.verbose:
-                print('Warning: could not read settings file', filepath)
+            verbosity(pargs, 'Warning: could not read settings file', filepath)
     for key in ['COUCHDB_SERVER', 'COUCHDB2_SERVER']:
         try:
             settings['SERVER'] = settings[key]
@@ -701,7 +699,7 @@ def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
             s['PASSWORD'] = None
         else:
             s['PASSWORD'] = '****'
-        print('settings:', json.dumps(s))
+        verbosity(pargs, 'settings:', json.dumps(s))
     return settings
 
 def get_database(server, settings):
@@ -754,8 +752,7 @@ def main(pargs, settings):
             except (IOError, ValueError, TypeError) as error:
                 sys.exit("Error: {}".format(error))
         db.save(doc)
-        if pargs.verbose:
-            print('saved doc', doc['_id'])
+        print('saved doc', doc['_id'])
     if pargs.get:
         db = get_database(server, settings)
         print(json.dumps(db[pargs.get], indent=2))
