@@ -739,7 +739,7 @@ def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
                             pass
             verbosity(pargs, 'settings read from file', filepath)
         except IOError:
-            verbosity(pargs, 'Warning: could not read settings file', filepath)
+            verbosity(pargs, 'Warning: no settings file', filepath)
     if pargs.server:
         settings['SERVER'] = pargs.server
     if pargs.database:
