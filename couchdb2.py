@@ -730,31 +730,16 @@ def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
     for filepath in filepaths:
         try:
             with open(os.path.expanduser(filepath), 'rb') as infile:
-                settings.update(json.load(infile))
+                data = json.load(infile)
+                for key in settings:
+                    for prefix in ['', 'COUCHDB_', 'COUCHDB2_']:
+                        try:
+                            settings[key] = data[prefix + key]
+                        except KeyError:
+                            pass
             verbosity(pargs, 'settings read from file', filepath)
         except IOError:
             verbosity(pargs, 'Warning: could not read settings file', filepath)
-    for key in ['COUCHDB_SERVER', 'COUCHDB2_SERVER']:
-        try:
-            settings['SERVER'] = settings[key]
-        except KeyError:
-            pass
-    for key in ['COUCHDB_DATABASE', 'COUCHDB2_DATABASE']:
-        try:
-            settings['DATABASE'] = settings[key]
-        except KeyError:
-            pass
-    for key in ['COUCHDB_USER', 'COUCHDB2_USER', 
-                'COUCHDB_USERNAME', 'COUCHDB2_USERNAME']:
-        try:
-            settings['USERNAME'] = settings[key]
-        except KeyError:
-            pass
-    for key in ['COUCHDB_PASSWORD', 'COUCHDB2_PASSWORD']:
-        try:
-            settings['PASSWORD'] = settings[key]
-        except KeyError:
-            pass
     if pargs.server:
         settings['SERVER'] = pargs.server
     if pargs.database:
