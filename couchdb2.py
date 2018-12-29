@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.3.2'
+__version__ = '1.3.3'
 
 import argparse
 import collections
@@ -283,7 +283,7 @@ class Database(object):
         response = self.server._DELETE(self.name, doc['_id'], 
                                        headers={'If-Match': doc['_rev']})
 
-    def load_design(self, name, doc, rebuild=True):
+    def load_design(self, designname, doc, rebuild=True):
         """Load the design document under the given name.
 
         If the existing design document is identical, no action is taken and
@@ -311,7 +311,7 @@ class Database(object):
         - Raise NotFoundError if no such database.
         - Raises IOError if something else went wrong.
         """
-        response = self.server._GET(self.name, '_design', name,
+        response = self.server._GET(self.name, '_design', designname,
                                     errors={404: None})
         if response.status_code == 200:
             current_doc = response.json()
@@ -319,10 +319,10 @@ class Database(object):
             doc['_rev'] = current_doc['_rev']
             if doc == current_doc: 
                 return False
-        response = self.server._PUT(self.name, '_design', name, json=doc)
+        response = self.server._PUT(self.name, '_design', designname, json=doc)
         if rebuild:
             for view in doc.get('views', {}):
-                self.view(name, view, limit=1)
+                self.view(designname, view, limit=1)
         return True
 
     def view(self, designname, viewname, key=None, keys=None,
@@ -374,15 +374,15 @@ class Database(object):
                           data.get('offset'),
                           data.get('total_rows'))
 
-    def load_index(self, fields, id=None, name=None, selector=None):
+    def load_index(self, fields, ddoc=None, name=None, selector=None):
         """Load a Mango index specification.
 
         - 'fields' is a list of fields to index.
-        - 'id' is the design document name.
-        - 'name' is the view name.
-        - 'selector' is a partial filter selector.
+        - 'ddoc' is the design document name. Generated if none given.
+        - 'name' is the name of the index. Generated if none given.
+        - 'selector' is a partial filter selector, which may be omitted.
 
-        Returns a dictionary with items 'id' (design document name),
+        Returns dictionary with items 'id' (design document identifier; sic!),
         'name' (index name) and 'result' ('created' or 'exists').
 
         - Raises BadRequestError if the index is malformed.
@@ -390,8 +390,8 @@ class Database(object):
         - Raises ServerError if there is an internal server error.
         """
         data = {'index': {'fields': fields}}
-        if id is not None:
-            data['ddoc'] = id
+        if ddoc is not None:
+            data['ddoc'] = ddoc
         if name is not None:
             data['name'] = name
         if selector is not None:
@@ -473,17 +473,19 @@ class Database(object):
 
         A tuple (ndocs, nfiles) is returned.
         """
+        ndocs = 0
         nfiles = 0
         if filepath.endswith('.gz'):
             mode = 'w:gz'
         else:
             mode = 'w'
         with tarfile.open(filepath, mode=mode) as outfile:
-            for ndocs, doc in enumerate(self):
+            for doc in self:
                 info = tarfile.TarInfo(doc['_id'])
                 data = json.dumps(doc)
                 info.size = len(data)
                 outfile.addfile(info, io.BytesIO(data))
+                ndocs += 1
                 # Attachments must follow their document.
                 for attname in doc.get('_attachments', dict()):
                     info = tarfile.TarInfo("{0}_att/{1}".format(
@@ -494,7 +496,7 @@ class Database(object):
                     else:
                         attdata = attfile.read()
                         attfile.close()
-                    info.size = len(data)
+                    info.size = len(attdata)
                     outfile.addfile(info, io.BytesIO(attdata))
                     nfiles += 1
                 if ndocs % 100 == 0 and progress_func:
@@ -923,7 +925,7 @@ def main(pargs, settings):
             print(json.dumps(data, indent=2))
     if pargs.dump:
         db = get_database(server, settings)
-        print('dumping', sep='', end='')
+        print("dumping '{}'.".format(db), sep='', end='')
         sys.stdout.flush()
         ndocs, nfiles = db.dump(pargs.dump, progress_func=print_dot)
         print()
@@ -932,7 +934,7 @@ def main(pargs, settings):
         db = get_database(server, settings)
         if len(db) != 0:
             sys.exit("database '{}' is not empty".format(db))
-        print('undumping', sep='', end='')
+        print("undumping '{}'.".format(db), sep='', end='')
         sys.stdout.flush()
         ndocs, nfiles = db.undump(pargs.undump, progress_func=print_dot)
         print()

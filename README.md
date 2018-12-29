@@ -218,7 +218,7 @@ Delete the document.
 
 ### load_design
 ```python
-db.load_design(name, doc, rebuild=True)
+db.load_design(designname, doc, rebuild=True)
 ```
 Load the design document under the given name.
 
@@ -259,16 +259,16 @@ Return a [ViewResult](#viewresult) object, containing
 
 ### load_index
 ```python
-db.load_index(fields, id=None, name=None, selector=None)
+db.load_index(fields, ddoc=None, name=None, selector=None)
 ```
 Load a Mango index specification.
 
 - 'fields' is a list of fields to index.
-- 'id' is the design document name.
-- 'name' is the view name.
-- 'selector' is a partial filter selector.
+- 'ddoc' is the design document name. Generated if none given.
+- 'name' is the name of the index. Generated if none given.
+- 'selector' is a partial filter selector, which may be omitted.
 
-Returns a dictionary with items 'id' (design document name),
+Returns dictionary with items 'id' (design document name; sic!),
 'name' (index name) and 'result' ('created' or 'exists').
 
 - Raises BadRequestError if the index is malformed.

@@ -182,18 +182,21 @@ def test_index():
     assert len(result['docs']) == 2
     assert not result.get('warning')
     # Load an index having a partial filter selector
-    result = db.load_index(['name'], selector={'type': 'person'})
-    person_name_index = result['name']
+    ddocname = 'mango'
+    indexname = 'myindex'
+    result = db.load_index(['name'], ddoc=ddocname, name=indexname,
+                           selector={'type': 'person'})
+    assert result['id'] == ddocname
+    assert result['name'] == indexname
     result = db.find({'type': 'person'})
-    # Does not use an index; warns about it
+    # Does not use an index; warns about that
     assert result.get('warning')
     assert len(result['docs']) == 2
-    # Use an explicit index
-    result = db.find({'name': 'Per', 'type': 'person'},
-                     use_index=person_name_index)
+    # Use an explicit selection
+    result = db.find({'name': 'Per', 'type': 'person'})
     assert len(result['docs']) == 1
-    # Same as above, implicitly
-    result = db.find({'name': 'Per'}, use_index=person_name_index)
+    # Same as above, implicit selection via partial index
+    result = db.find({'name': 'Per'}, use_index=[ddocname, indexname])
     assert len(result['docs']) == 1
     assert not result.get('warning')
     db.destroy()
