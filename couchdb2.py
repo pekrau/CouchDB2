@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.3.1'
+__version__ = '1.3.2'
 
 import argparse
 import collections
@@ -462,27 +462,28 @@ class Database(object):
                                        headers={'If-Match': doc['_rev']})
         return response.json()['rev']
 
-    def dump(self, filepath):
+    def dump(self, filepath, progress_func=None):
         """Dump the entire database to the named tar file.
-        If the filepath ends with '.gz', then the tar file is gzip compressed.
 
+        If defined, the function `progress_func(ndocs, nfiles)` is called 
+        every 100 documents.
+
+        If the filepath ends with `.gz`, then the tar file is gzip compressed.
         The `_rev` item of each document is kept.
 
         A tuple (ndocs, nfiles) is returned.
         """
-        ndocs = 0
         nfiles = 0
         if filepath.endswith('.gz'):
             mode = 'w:gz'
         else:
             mode = 'w'
         with tarfile.open(filepath, mode=mode) as outfile:
-            for doc in self:
+            for ndocs, doc in enumerate(self):
                 info = tarfile.TarInfo(doc['_id'])
                 data = json.dumps(doc)
                 info.size = len(data)
                 outfile.addfile(info, io.BytesIO(data))
-                ndocs += 1
                 # Attachments must follow their document.
                 for attname in doc.get('_attachments', dict()):
                     info = tarfile.TarInfo("{0}_att/{1}".format(
@@ -496,10 +497,15 @@ class Database(object):
                     info.size = len(data)
                     outfile.addfile(info, io.BytesIO(attdata))
                     nfiles += 1
+                if ndocs % 100 == 0 and progress_func:
+                    progress_func(ndocs, nfiles)
         return (ndocs, nfiles)
 
-    def undump(self, filepath):
+    def undump(self, filepath, progress_func=None):
         """Load the named tar file, which must have been produced by `dump`.
+
+        If defined, the function `progress_func(ndocs, nfiles)` is called 
+        every 100 documents.
 
         NOTE: The documents are just added to the database, ignoring any
         `_rev` items. This implies that they may not already exist.
@@ -529,6 +535,8 @@ class Database(object):
                         key = "{0}_att/{1}".format(doc['_id'], attname)
                         atts[key] = dict(filename=attname,
                                          content_type=attinfo['content_type'])
+                if ndocs % 100 == 0 and progress_func:
+                    progress_func(ndocs, nfiles)
         return (ndocs, nfiles)
 
 
@@ -789,6 +797,10 @@ def to_json(pargs, data):
         verbosity(pargs, 'wrote to file', pargs.output)
     return bool(pargs.output)
 
+def print_dot(*args):
+    print('.', sep='', end='')
+    sys.stdout.flush()
+
 def main(pargs, settings):
     "CouchDB2 command line tool."
     try:
@@ -832,8 +844,7 @@ def main(pargs, settings):
         sys.stdout.flush()
         while db.is_compact_running():
             time.sleep(1)
-            print('.', sep='', end='')
-            sys.stdout.flush()
+            print_dot()
         print()
 
     if pargs.save:
@@ -911,13 +922,20 @@ def main(pargs, settings):
         if not to_json(pargs, data):
             print(json.dumps(data, indent=2))
     if pargs.dump:
-        ndocs, nfiles = get_database(server, settings).dump(pargs.dump)
+        db = get_database(server, settings)
+        print('dumping', sep='', end='')
+        sys.stdout.flush()
+        ndocs, nfiles = db.dump(pargs.dump, progress_func=print_dot)
+        print()
         print('dumped', ndocs, 'documents,', nfiles, 'files')
     elif pargs.undump:
         db = get_database(server, settings)
         if len(db) != 0:
             sys.exit("database '{}' is not empty".format(db))
-        ndocs, nfiles = db.undump(pargs.undump)
+        print('undumping', sep='', end='')
+        sys.stdout.flush()
+        ndocs, nfiles = db.undump(pargs.undump, progress_func=print_dot)
+        print()
         print('undumped', ndocs, 'documents,', nfiles, 'files')
 
 

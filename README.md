@@ -314,20 +314,26 @@ Delete the attachment. Return the new revision of the document.
 
 ### dump
 ```python
-db.dump(filepath)
+db.dump(filepath, progress_func=None)
 ```
 Dump the entire database to the named tar file.
-If the filepath ends with '.gz', then the tar file is gzip compressed.
 
+If defined, the function `progress_func(ndocs, nfiles)` is called 
+every 100 documents.
+
+If the filepath ends with `.gz`, then the tar file is gzip compressed.
 The `_rev` item of each document is kept.
 
 A tuple `(ndocs, nfiles)` is returned.
 
 ### undump
 ```python
-db.undump(filepath)
+db.undump(filepath, progress_func=None)
 ```
 Load the named tar file, which must have been produced by `dump`.
+
+If defined, the function `progress_func(ndocs, nfiles)` is called 
+every 100 documents.
 
 NOTE: The documents are just added to the database, ignoring any
 `_rev` items.
