@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.3.0'
+__version__ = '1.3.1'
 
 import argparse
 import collections
@@ -868,7 +868,8 @@ def main(pargs, settings):
         db = get_database(server, settings)
         doc = db[pargs.attach[0]]
         with open(pargs.attach[1], 'rb') as infile:
-            db.put_attachment(doc, infile)
+            db.put_attachment(doc, infile, 
+                              filename=os.path.basename(pargs.attach[1]))
         verbosity(pargs, 
                   "attached file '{1}' to doc '{0}'".format(*pargs.attach))
     elif pargs.detach:
