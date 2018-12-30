@@ -1,40 +1,15 @@
 # CouchDB2
 
 Slim Python interface module to CouchDB v2.x.
-
-Relies on `requests`: http://docs.python-requests.org/en/master/
+Also contains a [command line tool](#command-line-tool)
 
 ## Installation
 
-Quick-and-dirty method, since this module is not yet on PyPi:
+This module relies on `requests`: http://docs.python-requests.org/en/master/
+
+Quick-and-dirty installation method, since this module is not yet on PyPi:
 ```
 $ pip install [-e] git+https://github.com/pekrau/CouchDB2.git#egg=couchdb2
-```
-
-## Command line tool
-
-Interact with the CouchDB server via the command line.
-
-Settings for the command line tool are updated in order from the following
-sources (if existing):
-
-1) Defaults are
-   ```
-   {
-     "SERVER": "http://localhost:5984",
-     "DATABASE": null,
-     "USERNAME": null,
-     "PASSWORD": null
-   }
-   ```
-2) From JSON file `~/.couchdb2`
-3) From JSON file `settings.json` (in the current working directory).
-4) From JSON file `--settings file`, if given.
-
-View all available command options by:
-
-```
-$ python couchdb2.py -h
 ```
 
 ## Server
@@ -173,10 +148,11 @@ Return the document with the given id, or the `default` value if not found.
 ```python
 db.put(doc)
 ```
-Insert or update the document.
+Insert or update the document. If the document is already in 
+the database, the `_rev` item must be present in the document.
 
-If the document does not contain an item '_id', it is added
-having a UUID4 value. The '_rev' item is added or updated.
+If the document does not contain an item `_id`, it is added
+having a UUID4 value. The `_rev` item is added or updated.
 
 ### delete
 ```python
@@ -387,3 +363,112 @@ Alias for field number 0
 Alias for field number 1
 ### total_rows
 Alias for field number 2
+
+## Command line tool
+
+Interact with the CouchDB server via the command line.
+
+Settings for the command line tool are updated in order from the following
+sources (if existing):
+
+1) Defaults are
+   ```
+   {
+     "SERVER": "http://localhost:5984",
+     "DATABASE": null,
+     "USERNAME": null,
+     "PASSWORD": null
+   }
+   ```
+2) From JSON file `~/.couchdb2`
+3) From JSON file `settings.json` (in the current working directory).
+4) From JSON file `--settings file`, if given.
+
+All available command options are shown by:
+
+```
+$ python couchdb2.py -h
+usage: couchdb2.py [-h] [-v] [-S SETTINGS] [-s SERVER] [-d DATABASE]
+                   [-u USERNAME] [-p PASSWORD] [-q] [-o FILEPATH]
+                   [--indent INT] [-f] [-V] [--list]
+                   [--create | --destroy | --compact] [--info]
+                   [--listdesigns | --getdesign DDOC | --putdesign DDOC FILEPATH]
+                   [--dump FILEPATH | --undump FILEPATH]
+                   [-P DOC_OR_FILEPATH | -G DOCID | --delete DOCID]
+                   [--attach DOCID FILEPATH | --detach DOCID FILENAME | --getfile DOCID FILENAME]
+                   [--view SPEC] [--key KEY | --startkey KEY] [--endkey KEY]
+                   [--startkey_docid DOCID] [--endkey_docid DOCID] [--group]
+                   [--group_level INT] [--noreduce] [--limit INT] [--skip INT]
+                   [--descending] [--include_docs]
+
+CouchDB2 command line tool
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -v, --verbose         print more information
+  -S SETTINGS, --settings SETTINGS
+                        settings file in JSON format
+  -s SERVER, --server SERVER
+                        server URL, including port number
+  -d DATABASE, --database DATABASE
+                        database to operate on
+  -u USERNAME, --username USERNAME
+                        CouchDB user account name
+  -p PASSWORD, --password PASSWORD
+                        CouchDB user account password
+  -q, --interactive_password
+                        ask for the password by interactive input
+  -o FILEPATH, --output FILEPATH
+                        write output to the given file (usually JSON format)
+  --indent INT          indentation level for JSON format output file
+  -f, --force           do not ask for interactive confirmation (delete,
+                        destroy)
+
+server operations:
+  -V, --version         output CouchDB server version
+  --list                output a list of the databases on the server
+
+database operations:
+  --create              create the database
+  --destroy             delete the database and all its contents
+  --compact             compact the database; may take some time
+  --info                output information about the database
+  --listdesigns         list design documents for the database
+  --getdesign DDOC      get the design document
+  --putdesign DDOC FILEPATH
+                        put the design document
+  --dump FILEPATH       create a dump file of the database
+  --undump FILEPATH     load a dump file into the database
+
+document operations:
+  -P DOC_OR_FILEPATH, --put DOC_OR_FILEPATH
+                        store the document (explicitly given, or filepath)
+  -G DOCID, --get DOCID
+                        output the document with the given identifier
+  --delete DOCID        delete the document with the given identifier
+
+attachments to document:
+  --attach DOCID FILEPATH
+                        attach the specified file to the given document
+  --detach DOCID FILENAME
+                        remove the attached file from the given document
+  --getfile DOCID FILENAME
+                        get the attached file from the given document; write
+                        to same filepath or that given by '-o'
+
+query a design view, returning rows:
+  --view SPEC           design view '{design}/{view}' to query
+  --key KEY             key value selecting view rows
+  --startkey KEY        start key value selecting range of view rows
+  --endkey KEY          end key value selecting range of view rows
+  --startkey_docid DOCID
+                        return rows starting with the specified document
+  --endkey_docid DOCID  stop returning rows when specified document reached
+  --group               group the results using the 'reduce' function
+  --group_level INT     specify the group level to use
+  --noreduce            do not use the 'reduce' function of the view
+  --limit INT           limit the number of returned rows
+  --skip INT            skip this number of rows before returning result
+  --descending          sort rows in descending order (swap start/end keys!)
+  --include_docs        include documents in result
+```

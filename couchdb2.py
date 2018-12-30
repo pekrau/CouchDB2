@@ -229,7 +229,11 @@ class Database(object):
         return response.json(object_pairs_hook=collections.OrderedDict)
 
     def put(self, doc):
-        """Insert or update the document.
+        """Insert or update the document. If the document is already in 
+        the database, the `_rev` item must be present in the document.
+
+        If the document does not contain an item `_id`, it is added
+        having a UUID4 value. The `_rev` item is added or updated.
 
         If the document does not contain an item '_id', it is added
         having a UUID4 value. The '_rev' item is added or updated.
