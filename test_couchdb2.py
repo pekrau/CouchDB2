@@ -1,5 +1,5 @@
 """Test the Python interface module to CouchDB v2.x.
-Uses py.test.
+Uses package py.test.
 """
 
 from __future__ import print_function
@@ -8,6 +8,8 @@ import pytest
 
 import couchdb2
 
+
+DBNAME = 'pytest'
 
 def test_server():
     server = couchdb2.Server()
@@ -21,47 +23,46 @@ def test_database():
     server = couchdb2.Server()
     # Keep track of how many databases to start with
     count = len(server)
-    name = 'mytest'
     # Make sure the test database is not present
-    assert name not in server
+    assert DBNAME not in server
     with pytest.raises(couchdb2.NotFoundError):
-        db = server[name]
+        db = server[DBNAME]
     # Create the test database, and check for it
-    db = server.create(name)
-    assert name in server
+    db = server.create(DBNAME)
+    assert DBNAME in server
     assert len(server) == count + 1
     # Fail to create it again
     with pytest.raises(couchdb2.CreationError):
-        another = couchdb2.Database(server, name, check=False).create()
+        another = couchdb2.Database(server, DBNAME, check=False).create()
     # Destroy the database, and check that it went away
     db.destroy()
     assert not db.exists()
-    assert name not in server
+    assert DBNAME not in server
     with pytest.raises(couchdb2.NotFoundError):
-        db = server[name]
+        db = server[DBNAME]
     assert len(server) == count
 
 def test_document_create():
-    db = couchdb2.Server().create('mytest')
+    db = couchdb2.Server().create(DBNAME)
     # Empty database
     assert len(db) == 0
-    # Save a document with predefined id
+    # Store a document with predefined id
     docid = 'hardwired id'
     doc = {'_id': docid, 'name': 'thingy', 'age': 1}
     doc1 = doc.copy()
-    db.save(doc1)
-    # Save keys of original document
+    db.put(doc1)
+    # Remember keys of original document
     keys1 = set(db.get(docid).keys())
     assert len(db) == 1
     # Exact copy of original document, except no '_rev'
     doc2 = doc.copy()
     with pytest.raises(couchdb2.RevisionError):
-        db.save(doc2)
+        db.put(doc2)
     # Delete the document, check it went away
     db.delete(doc1)
     assert doc1['_id'] not in db
     assert len(db) == 0
-    db.save(doc2)
+    db.put(doc2)
     # Keys of this document must be equal to keys of original
     keys2 = set(db.get(docid).keys())
     assert keys1 == keys2
@@ -71,19 +72,19 @@ def test_document_create():
 
 def test_document_update():
     server = couchdb2.Server()
-    db = server.create('mytest')
+    db = server.create(DBNAME)
     assert len(db) == 0
     doc = {'name': 'Per', 'age': 59, 'mood': 'jolly'}
-    # Save first revision of document
+    # Store first revision of document
     doc1 = doc.copy()
-    db.save(doc1)
+    db.put(doc1)
     id1 = doc1['_id']
     rev1 = doc1['_rev']
     assert len(db) == 1
-    # Save second revision of document
+    # Store second revision of document
     doc2 = doc1.copy()
     doc2['mood'] = 'excellent'
-    db.save(doc2)
+    db.put(doc2)
     # Get the second revision
     doc3 = db[id1]
     assert doc3['mood'] == 'excellent'
@@ -95,21 +96,21 @@ def test_document_update():
     db.destroy()
 
 def test_design_view():
-    db = couchdb2.Server().create('mytest')
-    db.load_design('docs',
-                   {'views':
-                    {'name':
-                     {'map': "function (doc) {if (doc.name===undefined) return;"
-                             " emit(doc.name, null);}"},
-                     'name_sum':
-                     {'map': "function (doc) {emit(doc.name, doc.number);}",
-                      'reduce': '_sum'},
-                     'name_count':
-                     {'map': "function (doc) {emit(doc.name, null);}",
-                      'reduce': '_count'}
-                    }})
+    db = couchdb2.Server().create(DBNAME)
+    db.put_design('docs',
+                  {'views':
+                   {'name':
+                    {'map': "function (doc) {if (doc.name===undefined) return;"
+                            " emit(doc.name, null);}"},
+                    'name_sum':
+                    {'map': "function (doc) {emit(doc.name, doc.number);}",
+                     'reduce': '_sum'},
+                    'name_count':
+                    {'map': "function (doc) {emit(doc.name, null);}",
+                     'reduce': '_count'}
+                   }})
     doc = {'name': 'mine', 'number': 2}
-    db.save(doc)
+    db.put(doc)
     # Get all rows: one single
     result = db.view('docs', 'name')
     assert len(result.rows) == 1
@@ -126,9 +127,9 @@ def test_design_view():
     assert row.key == 'mine'
     assert row.value is None
     assert row.doc == doc
-    # Save another document
+    # Store another document
     doc = {'name': 'another', 'number': 3}
-    db.save(doc)
+    db.put(doc)
     result = db.view('docs', 'name_sum')
     # Sum of all item in all documents; 1 row having no document
     assert len(result.rows) == 1
@@ -139,14 +140,14 @@ def test_design_view():
     assert len(result.rows) == 1
     assert result.rows[0].value == 2
     # No key 'name' in document; not included in index
-    db.save({'number': 8})
+    db.put({'number': 8})
     result = db.view('docs', 'name')
     assert len(result.rows) == 2
     assert result.total_rows == 2
     db.destroy()
 
 def test_iterator():
-    db = couchdb2.Server().create('mytest')
+    db = couchdb2.Server().create(DBNAME)
     orig = {'field': 'data'}
     # One more than chunk size to test paging
     N = couchdb2.Database.CHUNK_SIZE + 1
@@ -154,7 +155,7 @@ def test_iterator():
     for n in range(N):
         doc = orig.copy()
         doc['n'] = n
-        db.save(doc)
+        db.put(doc)
         docs[doc['_id']] = doc
     assert len(db) == N
     assert docs == dict([(d['_id'], d) for d in db])
@@ -164,10 +165,10 @@ def test_index():
     "Mango index; only for CouchDB version 2 and higher."
     server = couchdb2.Server()
     if not server.version.startswith('2'): return
-    db = server.create('mytest')
-    db.save({'name': 'Per', 'type': 'person', 'content': 'stuff'})
-    db.save({'name': 'Anders', 'type': 'person', 'content': 'other stuff'})
-    db.save({'name': 'Per', 'type': 'computer', 'content': 'data'})
+    db = server.create(DBNAME)
+    db.put({'name': 'Per', 'type': 'person', 'content': 'stuff'})
+    db.put({'name': 'Anders', 'type': 'person', 'content': 'other stuff'})
+    db.put({'name': 'Per', 'type': 'computer', 'content': 'data'})
     # Find without index
     result = db.find({'type': 'person'})
     assert len(result['docs']) == 2
@@ -202,10 +203,10 @@ def test_index():
     db.destroy()
 
 def test_document_attachments():
-    db = couchdb2.Server().create('mytest')
+    db = couchdb2.Server().create(DBNAME)
     id = 'mydoc'
     doc = {'_id': id, 'name': 'myfile', 'contents': 'a Python file'}
-    db.save(doc)
+    db.put(doc)
     # Load this file's contents as attachment
     with open(__file__, 'rb') as infile:
         db.put_attachment(doc, infile)

@@ -65,7 +65,6 @@ Return an iterator over all user-defined databases on the server.
 server[name]
 ```
 Get the named database.
-- Raises NotFoundError if no such database.
 
 ### \_\_contains\_\_
 ```python
@@ -78,25 +77,18 @@ Does the named database exist?
 server.get(name, check=True)
 ```
 Get the named database.
-- Raises NotFoundError if 'check' is True and no database exists.
 
 ### create
 ```python
 server.create(name)
 ```
 Create the named database.
-- Raises BadRequestError if the name is invalid.
-- Raises AuthorizationError if not server admin privileges.
-- Raises CreationError if a database with that name already exists.
-- Raises IOError if there is some other error.
 
 ### get_config
 ```python
 server.get_config(nodename='_local')
 ```
 Get the named node's configuration.
-- Raises AuthorizationError if not server admin privileges.
-- Raises IOError if there is some other error.
 
 ## Database
 ```python
@@ -121,8 +113,6 @@ Return the number of documents in the database.
 id in db
 ```
 Does a document with the given id exist in the database?
-- Raises AuthorizationError if not privileged to read.
-- Raises IOError if something else went wrong.
 
 ### \_\_iter\_\_
 ```python
@@ -135,9 +125,6 @@ Iterate over all documents in the database.
 db[id]
 ```
 Return the document with the given id.
-- Raises AuthorizationError if not privileged to read.
-- Raises NotFoundError if no such document or database.
-- Raises IOError if something else went wrong.
 
 ### exists
 ```python
@@ -148,25 +135,18 @@ Does this database exist?
 ```python
 db.check()
 ```
-- Raises NotFoundError if this database does not exist.
+Raises NotFoundError if this database does not exist.
 ### create
 ```python
 db.create()
 ```
 Create this database.
-- Raises BadRequestError if the name is invalid.
-- Raises AuthorizationError if not server admin privileges.
-- Raises CreationError if a database with that name already exists.
-- Raises IOError if there is some other error.
 
 ### destroy
 ```python
 db.destroy()
 ```
 Delete this database and all its contents.
-- Raises AuthorizationError if not server admin privileges.
-- Raises NotFoundError if no such database.
-- Raises IOError if there is some other error.
 
 ### get_info
 ```python
@@ -187,45 +167,45 @@ Is a compact operation running?
 ```python
 db.get(id, rev=None, revs_info=False, default=None)
 ```
-Return the document with the given id.
-- Returns the default if not found.
-- Raises AuthorizationError if not read privilege.
-- Raises IOError if there is some other error.
+Return the document with the given id, or the `default` value if not found.
 
-### save
+### put
 ```python
-db.save(doc)
+db.put(doc)
 ```
 Insert or update the document.
 
 If the document does not contain an item '_id', it is added
 having a UUID4 value. The '_rev' item is added or updated.
 
-- Raises NotFoundError if the database does not exist.
-- Raises AuthorizationError if not privileged to write.
-- Raises RevisionError if the '_rev' item does not match.
-- Raises IOError if something else went wrong.
-
 ### delete
 ```python
 db.delete(doc)
 ```
 Delete the document.
-- Raises NotFoundError if no such document or no '_id' item.
-- Raises RevisionError if no '_rev' item, or it does not match.
-- Raises ValueError if the request body or parameters are invalid.
-- Raises IOError if something else went wrong.
 
-### load_design
+### get_designs
 ```python
-db.load_design(designname, doc, rebuild=True)
+db.get_designs()
 ```
-Load the design document under the given name.
+Get the design documents for the database.
+
+### get_design
+```python
+db.get_design(designname)
+```
+Get the named design document.
+
+### put_design
+```python
+db.put_design(designname, doc, rebuild=True)
+```
+Insert or update the design document under the given name.
 
 If the existing design document is identical, no action is taken and
 False is returned, else the document is updated and True is returned.
 
-If 'rebuild' is True, force view indexes to be rebuilt after update.
+If `rebuild` is True, force view indexes to be rebuilt after update.
 
 Example of doc:
 ```
@@ -242,10 +222,6 @@ Example of doc:
 ```
 
 More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
-
-- Raises AuthorizationError if not privileged to write.
-- Raise NotFoundError if no such database.
-- Raises IOError if something else went wrong.
 
 ### view
 ```python
@@ -271,10 +247,6 @@ Load a Mango index specification.
 Returns dictionary with items 'id' (design document name; sic!),
 'name' (index name) and 'result' ('created' or 'exists').
 
-- Raises BadRequestError if the index is malformed.
-- Raises AuthorizationError if not server admin privileges.
-- Raises ServerError if there is an internal server error.
-
 ### find
 ```python
 db.find(selector, use_index=None, limit=None, skip=None, sort=None,
@@ -285,10 +257,6 @@ Select documents according to the Mango index selector.
 Returns a dictionary with items 'docs', 'warning', 'execution_stats'
 and 'bookmark'.
 
-- Raises BadRequestError if the selector is malformed.
-- Raises AuthorizationError if not privileged to read.
-- Raises ServerError if there is an internal server error.
-
 ### put_attachment
 ```python
 db.put_attachment(doc, content, filename=None, content_type=None)
@@ -297,8 +265,6 @@ db.put_attachment(doc, content, filename=None, content_type=None)
 of the document.
 
 If no filename, then an attempt is made to get it from content object.
-
-- Raises ValueError if no filename is available.
 
 ### get_attachment
 ```python

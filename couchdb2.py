@@ -31,9 +31,7 @@ class Server(object):
 
     def __init__(self, href='http://localhost:5984/',
                  username=None, password=None):
-        """Connect to the CouchDB server.
-        - Raises IOError if failure.
-        """
+        "Connect to the CouchDB server."
         self.href = href.rstrip('/') + '/'
         self.username = username
         self.password = password
@@ -59,9 +57,7 @@ class Server(object):
                      for n in data if not n.startswith('_')])
 
     def __getitem__(self, name):
-        """Get the named database.
-        - Raises NotFoundError if no such database.
-        """
+        "Get the named database."
         return Database(self, name, check=True)
 
     def __contains__(self, name):
@@ -70,18 +66,11 @@ class Server(object):
         return response.status_code == 200
 
     def get(self, name, check=True):
-        """Get the named database.
-        - Raises NotFoundError if 'check' is True and no database exists.
-        """
+        "Get the named database."
         return Database(self, name, check=check)
 
     def create(self, name):
-        """Create the named database.
-        - Raises BadRequestError if the name is invalid.
-        - Raises AuthorizationError if not server admin privileges.
-        - Raises CreationError if a database with that name already exists.
-        - Raises IOError if there is some other error.
-        """
+        "Create the named database."
         return Database(self, name, check=False).create()
 
     def get_config(self, nodename='_local'):
@@ -171,10 +160,7 @@ class Database(object):
         return self.server._GET(self.name).json()['doc_count']
 
     def __contains__(self, id):
-        """Does a document with the given id exist in the database?
-        - Raises AuthorizationError if not privileged to read.
-        - Raises IOError if something else went wrong.
-        """
+        "Does a document with the given id exist in the database?"
         response = self.server._HEAD(self.name, id, errors={404: None})
         return response.status_code in (200, 304)
 
@@ -183,11 +169,7 @@ class Database(object):
         return _DatabaseIterator(self, chunk_size=self.CHUNK_SIZE)
 
     def __getitem__(self, id):
-        """Return the document with the given id.
-        - Raises AuthorizationError if not privileged to read.
-        - Raises NotFoundError if no such document or database.
-        - Raises IOError if something else went wrong.
-        """
+        "Return the document with the given id."
         result = self.get(id)
         if result is None:
             raise NotFoundError('no such document')
@@ -200,26 +182,17 @@ class Database(object):
         return response.status_code == 200
 
     def check(self):
-        "- Raises NotFoundError if this database does not exist."
+        "Raises NotFoundError if this database does not exist."
         if not self.exists():
             raise NotFoundError("database '{}' does not exist".format(self))
 
     def create(self):
-        """Create this database.
-        - Raises BadRequestError if the name is invalid.
-        - Raises AuthorizationError if not server admin privileges.
-        - Raises CreationError if a database with that name already exists.
-        - Raises IOError if there is some other error.
-        """
+        "Create this database."
         self.server._PUT(self.name)
         return self
 
     def destroy(self):
-        """Delete this database and all its contents.
-        - Raises AuthorizationError if not server admin privileges.
-        - Raises NotFoundError if no such database.
-        - Raises IOError if there is some other error.
-        """
+        "Delete this database and all its contents."
         self.server._DELETE(self.name)
 
     def get_info(self):
@@ -236,11 +209,13 @@ class Database(object):
         response = self.server._GET(self.name)
         return response.json()['compact_running']
 
+    def view_cleanup(self):
+        "Remove view index files due to changed view in design documents."
+        self.server._POST(self.name, '_view_cleanup')
+
     def get(self, id, rev=None, revs_info=False, default=None):
-        """Return the document with the given id.
-        - Returns the default if not found.
-        - Raises AuthorizationError if not read privilege.
-        - Raises IOError if there is some other error.
+        """Return the document with the given id,
+        or the `default` value if not found.
         """
         params = {}
         if rev is not None:
@@ -253,16 +228,11 @@ class Database(object):
             return default
         return response.json(object_pairs_hook=collections.OrderedDict)
 
-    def save(self, doc):
+    def put(self, doc):
         """Insert or update the document.
 
         If the document does not contain an item '_id', it is added
         having a UUID4 value. The '_rev' item is added or updated.
-
-        - Raises NotFoundError if the database does not exist.
-        - Raises AuthorizationError if not privileged to write.
-        - Raises RevisionError if the '_rev' item does not match.
-        - Raises IOError if something else went wrong.
         """
         if '_id' not in doc:
             doc['_id'] = uuid.uuid4().hex
@@ -270,12 +240,7 @@ class Database(object):
         doc['_rev'] = response.json()['rev']
 
     def delete(self, doc):
-        """Delete the document.
-        - Raises NotFoundError if no such document or no '_id' item.
-        - Raises RevisionError if no '_rev' item, or it does not match.
-        - Raises ValueError if the request body or parameters are invalid.
-        - Raises IOError if something else went wrong.
-        """
+        "Delete the document."
         if '_rev' not in doc:
             raise RevisionError("missing '_rev' item in the document")
         if '_id' not in doc:
@@ -283,13 +248,21 @@ class Database(object):
         response = self.server._DELETE(self.name, doc['_id'], 
                                        headers={'If-Match': doc['_rev']})
 
-    def load_design(self, designname, doc, rebuild=True):
-        """Load the design document under the given name.
+    def get_designs(self):
+        "Get the design documents for the database."
+        return self.server._GET(self.name, '_design_docs').json()
+
+    def get_design(self, designname):
+        "Get the named design document."
+        return self.server._GET(self.name, '_design', designname).json()
+
+    def put_design(self, designname, doc, rebuild=True):
+        """Insert or update the design document under the given name.
 
         If the existing design document is identical, no action is taken and
         False is returned, else the document is updated and True is returned.
 
-        If 'rebuild' is True, force view indexes to be rebuilt after update.
+        If `rebuild` is True, force view indexes to be rebuilt after update.
 
         Example of doc:
         ```
@@ -306,10 +279,6 @@ class Database(object):
         ```
 
         More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
-
-        - Raises AuthorizationError if not privileged to write.
-        - Raise NotFoundError if no such database.
-        - Raises IOError if something else went wrong.
         """
         response = self.server._GET(self.name, '_design', designname,
                                     errors={404: None})
@@ -384,10 +353,6 @@ class Database(object):
 
         Returns dictionary with items 'id' (design document identifier; sic!),
         'name' (index name) and 'result' ('created' or 'exists').
-
-        - Raises BadRequestError if the index is malformed.
-        - Raises AuthorizationError if not server admin privileges.
-        - Raises ServerError if there is an internal server error.
         """
         data = {'index': {'fields': fields}}
         if ddoc is not None:
@@ -405,10 +370,6 @@ class Database(object):
 
         Returns a dictionary with items 'docs', 'warning', 'execution_stats'
         and 'bookmark'.
-
-        - Raises BadRequestError if the selector is malformed.
-        - Raises AuthorizationError if not privileged to read.
-        - Raises ServerError if there is an internal server error.
         """
         data = {'selector': selector}
         if limit is not None:
@@ -433,8 +394,6 @@ class Database(object):
         revision of the document.
 
         If no filename, then an attempt is made to get it from content object.
-
-        - Raises ValueError if no filename is available.
         """
         if filename is None:
             try:
@@ -531,7 +490,7 @@ class Database(object):
                                      object_pairs_hook=collections.OrderedDict)
                     doc.pop('_rev', None)
                     atts = doc.pop('_attachments', dict())
-                    self.save(doc)
+                    self.put(doc)
                     ndocs += 1
                     for attname, attinfo in atts.items():
                         key = "{0}_att/{1}".format(doc['_id'], attname)
@@ -589,7 +548,7 @@ class CreationError(CouchDB2Exception):
     "Could not create the entity; it exists already."
 
 class RevisionError(CouchDB2Exception):
-    "Wrong or missing '_rev' item in the document to save."
+    "Wrong or missing '_rev' item in the document to put."
 
 class AuthorizationError(CouchDB2Exception):
     "Current user not authorized to perform the operation."
@@ -627,7 +586,7 @@ def get_parser():
     p.add_argument('-d', '--database', help='database to operate on')
     p.add_argument('-u', '--username', help='CouchDB user account name')
     p.add_argument('-p', '--password', help='CouchDB user account password')
-    p.add_argument('-P', '--interactive_password', action='store_true',
+    p.add_argument('-q', '--interactive_password', action='store_true',
                    help='ask for the password by interactive input')
     p.add_argument('-o', '--output', metavar='FILEPATH',
                    help='write output to the given file (usually JSON format)')
@@ -643,8 +602,6 @@ def get_parser():
                     help='output a list of the databases on the server')
 
     g1 = p.add_argument_group('database operations')
-    g1.add_argument('--info', action='store_true',
-                     help='output information about the database')
     x11 = g1.add_mutually_exclusive_group()
     x11.add_argument('--create', action='store_true',
                      help='create the database')
@@ -652,19 +609,28 @@ def get_parser():
                      help='delete the database and all its contents')
     x11.add_argument('--compact', action='store_true',
                      help='compact the database; may take some time')
+    g1.add_argument('--info', action='store_true',
+                     help='output information about the database')
     x12 = g1.add_mutually_exclusive_group()
-    x12.add_argument('--dump', metavar='FILEPATH',
+    x12.add_argument('--listdesigns', action='store_true',
+                     help='list design documents for the database')
+    x12.add_argument('--getdesign', metavar='DDOC',
+                     help='get the design document')
+    x12.add_argument('--putdesign', nargs=2, metavar=('DDOC', 'FILEPATH'),
+                     help='put the design document')
+    x13 = g1.add_mutually_exclusive_group()
+    x13.add_argument('--dump', metavar='FILEPATH',
                      help='create a dump file of the database')
-    x12.add_argument('--undump', metavar='FILEPATH',
+    x13.add_argument('--undump', metavar='FILEPATH',
                      help='load a dump file into the database')
 
     g2 = p.add_argument_group('document operations')
     x2 = g2.add_mutually_exclusive_group()
-    x2.add_argument('--save', metavar='DOC_OR_FILEPATH',
-                    help='save the document (from file or explicit)')
-    x2.add_argument('--get', metavar="DOCID",
+    x2.add_argument('-P', '--put', metavar='DOC_OR_FILEPATH',
+                    help='store the document (explicitly given, or filepath)')
+    x2.add_argument('-G', '--get', metavar="DOCID",
                     help='output the document with the given identifier')
-    x2.add_argument('--delete', metavar="DOCID", # XXX
+    x2.add_argument('--delete', metavar="DOCID",
                     help='delete the document with the given identifier')
 
     g3 = p.add_argument_group('attachments to document')
@@ -769,10 +735,15 @@ def verbosity(pargs, *args):
     if not pargs.verbose: return
     print(*args)
 
-def to_json(pargs, data):
-    """If '--output' was used, write the data in JSON format to the file.
-    The indentation level is set by '--indent'.
-    If the filepath ends in '.gz'. then a gzipped file is produced.
+def json_print_output(pargs, data, else_print=True):
+    """If `--output` was used, write the data in JSON format to the file.
+    The indentation level is set by `--indent`.
+    If the filepath ends in `.gz`. then a gzipped file is produced.
+
+    If `else_print` is True and `--output` was not used, then use `print()`
+    for indented JSON output.
+
+    Return True if `--output` was used, else False.
     """
     if pargs.output:
         if pargs.output.endswith('.gz'):
@@ -782,6 +753,8 @@ def to_json(pargs, data):
             with open(pargs.output, 'wb') as outfile:
                 json.dump(data, outfile, indent=pargs.indent)
         verbosity(pargs, 'wrote to file', pargs.output)
+    else:
+        print(json.dumps(data, indent=2))
     return bool(pargs.output)
 
 def print_dot(*args):
@@ -800,19 +773,15 @@ def main(pargs, settings):
                     username=settings['USERNAME'],
                     password=settings['PASSWORD'])
     if pargs.version:
-        if not to_json(pargs, server.version):
+        if not json_print_output(pargs, server.version, else_print=False):
             print(server.version)
     if pargs.list:
         dbs = list(server)
-        if not to_json(pargs, [str(db) for db in dbs]):
+        if not json_print_output(pargs, [str(db) for db in dbs], else_print=False):
             for db in dbs:
                 print(db)
 
-    if pargs.info:
-        doc = get_database(server, settings).get_info()
-        if not to_json(pargs, doc):
-            print(json.dumps(db, indent=2))
-    elif pargs.create:
+    if pargs.create:
         db = server.create(settings['DATABASE'])
         verbosity(pargs, 'created database', db)
     elif pargs.destroy:
@@ -834,28 +803,38 @@ def main(pargs, settings):
             print_dot()
         print()
 
-    if pargs.save:
+    if pargs.info:
+        doc = get_database(server, settings).get_info()
+        json_print_output(pargs, doc)
+
+    if pargs.listdesigns:
+        data = get_database(server, settings).get_designs()
+        json_print_output(pargs, data)
+    elif pargs.getdesign:
+        data = get_database(server, settings).get_design(pargs.getdesign)
+        json_print_output(pargs, data)
+
+    if pargs.put:
         db = get_database(server, settings)
         try:                    # Attempt to interpret arg as explicit doc
-            doc = json.loads(pargs.save,
+            doc = json.loads(pargs.put,
                              object_pairs_hook=collections.OrderedDict)
         except (ValueError, TypeError): # Arg is filepath to doc
             try:
-                with open(pargs.save, 'rb') as infile:
+                with open(pargs.put, 'rb') as infile:
                     doc = json.load(infile,
                                     object_pairs_hook=collections.OrderedDict)
             except (IOError, ValueError, TypeError) as error:
                 sys.exit("Error: {}".format(error))
         id = doc.get('_id')
-        db.save(doc)
+        db.put(doc)
         if id:
-            verbosity(pargs, 'saved doc', doc['_id'])
+            verbosity(pargs, 'stored doc', doc['_id'])
         else:
-            print('saved doc', doc['_id'])
+            print('stored doc', doc['_id'])
     elif pargs.get:
         doc = get_database(server, settings)[pargs.get]
-        if not to_json(pargs, doc):
-            print(json.dumps(doc, indent=2))
+        json_print_output(pargs, doc)
     elif pargs.delete:
         db = get_database(server, settings)
         doc = db[pargs.delete]
@@ -906,8 +885,7 @@ def main(pargs, settings):
         data['total_rows'] = result.total_rows
         data['offset'] = result.offset
         data['rows'] = rows = [r._asdict() for r in result.rows]
-        if not to_json(pargs, data):
-            print(json.dumps(data, indent=2))
+        json_print_output(pargs, data)
     if pargs.dump:
         db = get_database(server, settings)
         print("dumping '{}'.".format(db), sep='', end='')
