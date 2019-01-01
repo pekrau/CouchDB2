@@ -1,4 +1,4 @@
-"""Slim Python interface module to CouchDB v2.x.
+"""Slim Python interface module for CouchDB v2.x.
 
 Relies on requests: http://docs.python-requests.org/en/master/
 """
@@ -582,22 +582,22 @@ _ERRORS = {
 def get_parser():
     "Get the parser for the command line tool."
     p = argparse.ArgumentParser(description='CouchDB2 command line tool')
-    p.add_argument('-v', '--verbose', action='store_true',
-                   help='print more information')
-    p.add_argument('-S', '--settings',
-                   help='settings file in JSON format')
-    p.add_argument('-s', '--server', help='server URL, including port number')
+    p.add_argument('--settings', help='settings file in JSON format')
+    p.add_argument('-S', '--server',
+                   help='CouchDB server URL, including port number')
     p.add_argument('-d', '--database', help='database to operate on')
     p.add_argument('-u', '--username', help='CouchDB user account name')
     p.add_argument('-p', '--password', help='CouchDB user account password')
-    p.add_argument('-q', '--interactive_password', action='store_true',
+    p.add_argument('-q', '--password_question', action='store_true',
                    help='ask for the password by interactive input')
     p.add_argument('-o', '--output', metavar='FILEPATH',
                    help='write output to the given file (usually JSON format)')
     p.add_argument('--indent', type=int, metavar='INT',
                    help='indentation level for JSON format output file')
-    p.add_argument('-f', '--force', action='store_true',
-                   help='do not ask for interactive confirmation (delete, destroy)')
+    p.add_argument('-y', '--yes', action='store_true',
+                   help='do not ask for confirmation (delete, destroy)')
+    p.add_argument('-v', '--verbose', action='store_true',
+                   help='print more information')
 
     g0 = p.add_argument_group('server operations')
     g0.add_argument('-V', '--version', action='store_true',
@@ -771,7 +771,7 @@ def main(pargs, settings):
         input = raw_input
     except NameError:
         pass
-    if pargs.interactive_password:
+    if pargs.password_question:
         settings['PASSWORD'] = getpass.getpass('password > ')
     server = Server(href=settings['SERVER'],
                     username=settings['USERNAME'],
@@ -790,11 +790,11 @@ def main(pargs, settings):
         verbosity(pargs, 'created database', db)
     elif pargs.destroy:
         db = get_database(server, settings)
-        if not pargs.force:
+        if not pargs.yes:
             answer = input("really destroy database '{}' [n] ? ".format(db))
             if answer and answer.lower()[0] in ('y', 't'):
-                pargs.force = True
-        if pargs.force:
+                pargs.yes = True
+        if pargs.yes:
             db.destroy()
             verbosity(pargs, 'destroyed database', settings['DATABASE'])
     elif pargs.compact:

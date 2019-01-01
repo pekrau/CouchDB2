@@ -1,6 +1,6 @@
 # CouchDB2
 
-Slim Python interface module to CouchDB v2.x.
+Slim Python interface module for CouchDB v2.x.
 Also contains a [command line tool](#command-line-tool)
 
 ## Installation
