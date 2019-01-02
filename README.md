@@ -138,8 +138,14 @@ db.compact(finish=False, callback=None)
 Compact the CouchDB database.
 
 If `finish` is True, then return only when compaction is done.
-If defined, the function `callback(seconds)` is called it every
-second until compaction is done.
+In addition, if defined, the function `callback(seconds)` is called
+every second until compaction is done.
+
+### view_cleanup
+```python
+db.view_cleanup()
+```
+Remove view index files due to changed view in design documents.
 
 ### get
 ```python

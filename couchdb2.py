@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.3.4'
+__version__ = '1.3.5'
 
 import argparse
 import collections
@@ -203,8 +203,8 @@ class Database(object):
         """Compact the CouchDB database.
 
         If `finish` is True, then return only when compaction is done.
-        If defined, the function `callback(seconds)` is called it every
-        second until compaction is done.
+        In addition, if defined, the function `callback(seconds)` is called
+        every second until compaction is done.
         """
         self.server._POST(self.name, '_compact',
                           headers={'Content-Type': JSON_MIME})
@@ -624,6 +624,8 @@ def get_parser():
                      help='delete the database and all its contents')
     x11.add_argument('--compact', action='store_true',
                      help='compact the database; may take some time')
+    x11.add_argument('--view_cleanup', action='store_true',
+                     help='remove view index files no longer required')
     g1.add_argument('--info', action='store_true',
                      help='output information about the database')
     x12 = g1.add_mutually_exclusive_group()
@@ -815,13 +817,15 @@ def main(pargs, settings):
             message(pargs, 'destroyed database', settings['DATABASE'])
     elif pargs.compact:
         db = get_database(server, settings)
-        db.compact()
-        print("compacting '{}'.".format(db), sep='', end='')
-        sys.stdout.flush()
-        while db.is_compact_running():
-            time.sleep(1)
-            print_dot()
-        print()
+        if pargs.silent:
+            db.compact(finish=True)
+        else:
+            print("compacting '{}'.".format(db), sep='', end='')
+            sys.stdout.flush()
+            db.compact(finish=True, callback=print_dot)
+            print()
+    elif pargs.view_cleanup:
+        get_database(server, settings).view_cleanup()
 
     if pargs.info:
         doc = get_database(server, settings).get_info()
