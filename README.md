@@ -404,4 +404,91 @@ sources (if existing):
 Available command options:
 
 ```
+usage: couchdb2.py [-h] [--settings SETTINGS] [-S SERVER] [-d DATABASE]
+                   [-u USERNAME] [-p PASSWORD] [-q] [-o FILEPATH]
+                   [--indent INT] [-y] [-v | -s] [-V] [--list]
+                   [--create | --destroy] [--compact] [--compact_design DDOC]
+                   [--view_cleanup] [--info]
+                   [--list_designs | --get_design DDOC | --put_design DDOC FILEPATH | --delete_design DDOC]
+                   [--dump FILEPATH | --undump FILEPATH]
+                   [-P FILEPATH | -G DOCID | --delete DOCID]
+                   [--attach DOCID FILEPATH | --detach DOCID FILENAME | --getfile DOCID FILENAME]
+                   [--view SPEC] [--key KEY | --startkey KEY] [--endkey KEY]
+                   [--startkey_docid DOCID] [--endkey_docid DOCID] [--group]
+                   [--group_level INT] [--noreduce] [--limit INT] [--skip INT]
+                   [--descending] [--include_docs]
+
+CouchDB2 command line tool
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --settings SETTINGS   settings file in JSON format
+  -S SERVER, --server SERVER
+                        CouchDB server URL, including port number
+  -d DATABASE, --database DATABASE
+                        database to operate on
+  -u USERNAME, --username USERNAME
+                        CouchDB user account name
+  -p PASSWORD, --password PASSWORD
+                        CouchDB user account password
+  -q, --password_question
+                        ask for the password by interactive input
+  -o FILEPATH, --output FILEPATH
+                        write output to the given file (usually JSON format)
+  --indent INT          indentation level for JSON format output file
+  -y, --yes             do not ask for confirmation (delete, destroy)
+  -v, --verbose         print more information
+  -s, --silent          print no information
+
+server operations:
+  -V, --version         output CouchDB server version
+  --list                output a list of the databases on the server
+
+database operations:
+  --create              create the database
+  --destroy             delete the database and all its contents
+  --compact             compact the database; may take some time
+  --compact_design DDOC
+                        compact the view indexes for the named design doc
+  --view_cleanup        remove view index files no longer required
+  --info                output information about the database
+  --list_designs        list design documents for the database
+  --get_design DDOC     get the named design document
+  --put_design DDOC FILEPATH
+                        store the named design document from the file
+  --delete_design DDOC  delete the named design document
+  --dump FILEPATH       create a dump file of the database
+  --undump FILEPATH     load a dump file into the database
+
+document operations:
+  -P FILEPATH, --put FILEPATH
+                        store the document given by filepath or explicitly
+  -G DOCID, --get DOCID
+                        output the document with the given identifier
+  --delete DOCID        delete the document with the given identifier
+
+attachments to document:
+  --attach DOCID FILEPATH
+                        attach the specified file to the given document
+  --detach DOCID FILENAME
+                        remove the attached file from the given document
+  --getfile DOCID FILENAME
+                        get the attached file from the given document; write
+                        to same filepath or that given by '-o'
+
+query a design view, returning rows:
+  --view SPEC           design view '{design}/{view}' to query
+  --key KEY             key value selecting view rows
+  --startkey KEY        start key value selecting range of view rows
+  --endkey KEY          end key value selecting range of view rows
+  --startkey_docid DOCID
+                        return rows starting with the specified document
+  --endkey_docid DOCID  stop returning rows when specified document reached
+  --group               group the results using the 'reduce' function
+  --group_level INT     specify the group level to use
+  --noreduce            do not use the 'reduce' function of the view
+  --limit INT           limit the number of returned rows
+  --skip INT            skip this number of rows before returning result
+  --descending          sort rows in descending order (swap start/end keys!)
+  --include_docs        include documents in result
 ```

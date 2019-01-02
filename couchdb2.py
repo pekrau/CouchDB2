@@ -286,15 +286,15 @@ class Database(object):
 
         Example of doc:
         ```
-          {'views':
-            {'name':
-              {'map': "function (doc) {emit(doc.name, null);}"},
-             'name_sum':
-              {'map': "function (doc) {emit(doc.name, 1);}",
-               'reduce': '_sum'},
-             'name_count':
-              {'map': "function (doc) {emit(doc.name, null);}",
-               'reduce': '_count'}
+          {"views":
+            {"name":
+              {"map": "function (doc) {emit(doc.name, null);}"},
+             "name_sum":
+              {"map": "function (doc) {emit(doc.name, 1);}",
+               "reduce": "_sum"},
+             "name_count":
+              {"map": "function (doc) {emit(doc.name, null);}",
+               "reduce": "_count"}
           }}
         ```
 
@@ -632,7 +632,7 @@ def get_parser():
                      help='delete the database and all its contents')
     g1.add_argument('--compact', action='store_true',
                     help='compact the database; may take some time')
-    g1.add_argument('--compact_design',
+    g1.add_argument('--compact_design', metavar='DDOC',
                     help='compact the view indexes for the named design doc')
     g1.add_argument('--view_cleanup', action='store_true',
                     help='remove view index files no longer required')
@@ -642,7 +642,7 @@ def get_parser():
     x12.add_argument('--list_designs', action='store_true',
                      help='list design documents for the database')
     x12.add_argument('--get_design', metavar='DDOC',
-                     help='get the design document')
+                     help='get the named design document')
     x12.add_argument('--put_design', nargs=2, metavar=('DDOC', 'FILEPATH'),
                      help='store the named design document from the file')
     x12.add_argument('--delete_design', metavar='DDOC',
@@ -655,8 +655,8 @@ def get_parser():
 
     g2 = p.add_argument_group('document operations')
     x2 = g2.add_mutually_exclusive_group()
-    x2.add_argument('-P', '--put', metavar='DOC_OR_FILEPATH',
-                    help='store the document (explicitly given, or filepath)')
+    x2.add_argument('-P', '--put', metavar='FILEPATH',
+                    help='store the document given by filepath or explicitly')
     x2.add_argument('-G', '--get', metavar="DOCID",
                     help='output the document with the given identifier')
     x2.add_argument('--delete', metavar="DOCID",
@@ -836,7 +836,7 @@ def main(pargs, settings):
                 pargs.yes = True
         if pargs.yes:
             db.destroy()
-            message(pargs, 'destroyed database', settings['DATABASE'])
+            message(pargs, "destroyed database '{}".format(db))
     if pargs.compact:
         db = get_database(server, settings)
         if pargs.silent:
@@ -874,13 +874,12 @@ def main(pargs, settings):
         message(pargs, 'deleted design', pargs.delete_design)
 
     if pargs.put:
-        db = get_database(server, settings)
         try:                    # Attempt to interpret arg as explicit doc
             doc = json.loads(pargs.put,
                              object_pairs_hook=collections.OrderedDict)
         except (ValueError, TypeError): # Arg is filepath to doc
             doc = json_input(pargs.put)
-        db.put(doc)
+        get_database(server, settings).put(doc)
         message(pargs, 'stored doc', doc['_id'])
     elif pargs.get:
         doc = get_database(server, settings)[pargs.get]
@@ -936,22 +935,29 @@ def main(pargs, settings):
         data['offset'] = result.offset
         data['rows'] = rows = [r._asdict() for r in result.rows]
         json_output(pargs, data, else_print=True)
+
     if pargs.dump:
         db = get_database(server, settings)
-        print("dumping '{}'.".format(db), sep='', end='')
-        sys.stdout.flush()
-        ndocs, nfiles = db.dump(pargs.dump, callback=print_dot)
-        print()
-        print('dumped', ndocs, 'documents,', nfiles, 'files')
+        if pargs.silent:
+            db.dump(pargs.dump)
+        else:
+            print("dumping '{}'.".format(db), sep='', end='')
+            sys.stdout.flush()
+            ndocs, nfiles = db.dump(pargs.dump, callback=print_dot)
+            print()
+            print('dumped', ndocs, 'documents,', nfiles, 'files')
     elif pargs.undump:
         db = get_database(server, settings)
         if len(db) != 0:
             sys.exit("database '{}' is not empty".format(db))
-        print("undumping '{}'.".format(db), sep='', end='')
-        sys.stdout.flush()
-        ndocs, nfiles = db.undump(pargs.undump, callback=print_dot)
-        print()
-        print('undumped', ndocs, 'documents,', nfiles, 'files')
+        if pargs.silent:
+            db.undump(pargs.undump)
+        else:
+            print("undumping '{}'.".format(db), sep='', end='')
+            sys.stdout.flush()
+            ndocs, nfiles = db.undump(pargs.undump, callback=print_dot)
+            print()
+            print('undumped', ndocs, 'documents,', nfiles, 'files')
 
 
 if __name__ == '__main__':
