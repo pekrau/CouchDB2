@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.3.3'
+__version__ = '1.3.4'
 
 import argparse
 import collections
@@ -199,15 +199,23 @@ class Database(object):
         "Return a dictionary containing information about the database."
         return self.server._GET(self.name).json()
 
-    def compact(self):
-        "Compact the database on disk. May take some time."
+    def compact(self, finish=False, callback=None):
+        """Compact the CouchDB database.
+
+        If `finish` is True, then return only when compaction is done.
+        If defined, the function `callback(seconds)` is called it every
+        second until compaction is done.
+        """
         self.server._POST(self.name, '_compact',
                           headers={'Content-Type': JSON_MIME})
-
-    def is_compact_running(self):
-        "Is a compact operation running?"
-        response = self.server._GET(self.name)
-        return response.json()['compact_running']
+        if finish:
+            response = self.server._GET(self.name)
+            seconds = 0
+            while response.json().get('compact_running'):
+                time.sleep(1)
+                seconds += 1
+                if callback: callback(seconds)
+                response = self.server._GET(self.name)
 
     def view_cleanup(self):
         "Remove view index files due to changed view in design documents."
@@ -425,10 +433,10 @@ class Database(object):
                                        headers={'If-Match': doc['_rev']})
         return response.json()['rev']
 
-    def dump(self, filepath, progress_func=None):
+    def dump(self, filepath, callback=None):
         """Dump the entire database to the named tar file.
 
-        If defined, the function `progress_func(ndocs, nfiles)` is called 
+        If defined, the function `callback(ndocs, nfiles)` is called 
         every 100 documents.
 
         If the filepath ends with `.gz`, then the tar file is gzip compressed.
@@ -462,14 +470,14 @@ class Database(object):
                     info.size = len(attdata)
                     outfile.addfile(info, io.BytesIO(attdata))
                     nfiles += 1
-                if ndocs % 100 == 0 and progress_func:
-                    progress_func(ndocs, nfiles)
+                if ndocs % 100 == 0 and callback:
+                    callback(ndocs, nfiles)
         return (ndocs, nfiles)
 
-    def undump(self, filepath, progress_func=None):
+    def undump(self, filepath, callback=None):
         """Load the named tar file, which must have been produced by `dump`.
 
-        If defined, the function `progress_func(ndocs, nfiles)` is called 
+        If defined, the function `callback(ndocs, nfiles)` is called 
         every 100 documents.
 
         NOTE: The documents are just added to the database, ignoring any
@@ -500,8 +508,8 @@ class Database(object):
                         key = "{0}_att/{1}".format(doc['_id'], attname)
                         atts[key] = dict(filename=attname,
                                          content_type=attinfo['content_type'])
-                if ndocs % 100 == 0 and progress_func:
-                    progress_func(ndocs, nfiles)
+                if ndocs % 100 == 0 and callback:
+                    callback(ndocs, nfiles)
         return (ndocs, nfiles)
 
 
@@ -747,13 +755,13 @@ def verbose(pargs, *args):
     if not pargs.verbose: return
     print(*args)
 
-def json_print_output(pargs, data, else_print=True):
+def json_output(pargs, data, else_print=False):
     """If `--output` was used, write the data in JSON format to the file.
     The indentation level is set by `--indent`.
     If the filepath ends in `.gz`. then a gzipped file is produced.
 
-    If `else_print` is True and `--output` was not used, then use `print()`
-    for indented JSON output.
+    If `--output` was not used and `else_print` is True,
+    then use `print()` for indented JSON output.
 
     Return True if `--output` was used, else False.
     """
@@ -764,8 +772,8 @@ def json_print_output(pargs, data, else_print=True):
         else:
             with open(pargs.output, 'wb') as outfile:
                 json.dump(data, outfile, indent=pargs.indent)
-        message(pargs, 'wrote to file', pargs.output)
-    else:
+        verbose(pargs, 'wrote JSON to file', pargs.output)
+    elif else_print:
         print(json.dumps(data, indent=2))
     return bool(pargs.output)
 
@@ -785,11 +793,11 @@ def main(pargs, settings):
                     username=settings['USERNAME'],
                     password=settings['PASSWORD'])
     if pargs.version:
-        if not json_print_output(pargs, server.version, else_print=False):
+        if not json_output(pargs, server.version):
             print(server.version)
     if pargs.list:
         dbs = list(server)
-        if not json_print_output(pargs, [str(db) for db in dbs], else_print=False):
+        if not json_output(pargs, [str(db) for db in dbs]):
             for db in dbs:
                 print(db)
 
@@ -817,14 +825,14 @@ def main(pargs, settings):
 
     if pargs.info:
         doc = get_database(server, settings).get_info()
-        json_print_output(pargs, doc)
+        json_output(pargs, doc, else_print=True)
 
     if pargs.listdesigns:
         data = get_database(server, settings).get_designs()
-        json_print_output(pargs, data)
+        json_output(pargs, data, else_print=True)
     elif pargs.getdesign:
         data = get_database(server, settings).get_design(pargs.getdesign)
-        json_print_output(pargs, data)
+        json_output(pargs, data, else_print=True)
 
     if pargs.put:
         db = get_database(server, settings)
@@ -842,7 +850,7 @@ def main(pargs, settings):
         message(pargs, 'stored doc', doc['_id'])
     elif pargs.get:
         doc = get_database(server, settings)[pargs.get]
-        json_print_output(pargs, doc)
+        json_output(pargs, doc, else_print=True)
     elif pargs.delete:
         db = get_database(server, settings)
         doc = db[pargs.delete]
@@ -893,12 +901,12 @@ def main(pargs, settings):
         data['total_rows'] = result.total_rows
         data['offset'] = result.offset
         data['rows'] = rows = [r._asdict() for r in result.rows]
-        json_print_output(pargs, data)
+        json_output(pargs, data, else_print=True)
     if pargs.dump:
         db = get_database(server, settings)
         print("dumping '{}'.".format(db), sep='', end='')
         sys.stdout.flush()
-        ndocs, nfiles = db.dump(pargs.dump, progress_func=print_dot)
+        ndocs, nfiles = db.dump(pargs.dump, callback=print_dot)
         print()
         print('dumped', ndocs, 'documents,', nfiles, 'files')
     elif pargs.undump:
@@ -907,7 +915,7 @@ def main(pargs, settings):
             sys.exit("database '{}' is not empty".format(db))
         print("undumping '{}'.".format(db), sep='', end='')
         sys.stdout.flush()
-        ndocs, nfiles = db.undump(pargs.undump, progress_func=print_dot)
+        ndocs, nfiles = db.undump(pargs.undump, callback=print_dot)
         print()
         print('undumped', ndocs, 'documents,', nfiles, 'files')
 
