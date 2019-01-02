@@ -135,7 +135,8 @@ Return a dictionary containing information about the database.
 ```python
 db.compact(finish=False, callback=None)
 ```
-Compact the CouchDB database.
+Compact the CouchDB database by rewriting the disk database file
+and removing old revisions of documents.
 
 If `finish` is True, then return only when compaction is done.
 In addition, if defined, the function `callback(seconds)` is called
@@ -145,7 +146,8 @@ every second until compaction is done.
 ```python
 db.view_cleanup()
 ```
-Remove view index files due to changed view in design documents.
+Remove unnecessary view index files due to changed views in
+design documents of the database.
 
 ### get
 ```python
@@ -194,19 +196,25 @@ If `rebuild` is True, force view indexes to be rebuilt after update.
 
 Example of doc:
 ```
-  {'views':
-    {'name':
-      {'map': "function (doc) {emit(doc.name, null);}"},
-     'name_sum':
-      {'map': "function (doc) {emit(doc.name, 1);}",
-       'reduce': '_sum'},
-     'name_count':
-      {'map': "function (doc) {emit(doc.name, null);}",
-       'reduce': '_count'}
+  {"views":
+    {"name":
+      {"map": "function (doc) {emit(doc.name, null);}"},
+     "name_sum":
+      {"map": "function (doc) {emit(doc.name, 1);}",
+       "reduce": "_sum"},
+     "name_count":
+      {"map": "function (doc) {emit(doc.name, null);}",
+       "reduce": "_count"}
   }}
 ```
 
 More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
+
+### compact_design
+```python
+db.compact_design(designname)
+```
+Compact the view indexes associated with the named design document.
 
 ### view
 ```python

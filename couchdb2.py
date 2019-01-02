@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.3.5'
+__version__ = '1.3.6'
 
 import argparse
 import collections
@@ -200,7 +200,8 @@ class Database(object):
         return self.server._GET(self.name).json()
 
     def compact(self, finish=False, callback=None):
-        """Compact the CouchDB database.
+        """Compact the CouchDB database by rewriting the disk database file
+        and removing old revisions of documents.
 
         If `finish` is True, then return only when compaction is done.
         In addition, if defined, the function `callback(seconds)` is called
@@ -217,8 +218,15 @@ class Database(object):
                 if callback: callback(seconds)
                 response = self.server._GET(self.name)
 
+    def compact_design(self, designname):
+        "Compact the view indexes associated with the named design document."
+        self.server._POST(self.name, '_compact', designname,
+                          headers={'Content-Type': JSON_MIME})
+
     def view_cleanup(self):
-        "Remove view index files due to changed view in design documents."
+        """Remove unnecessary view index files due to changed views in
+        design documents of the database.
+        """
         self.server._POST(self.name, '_view_cleanup')
 
     def get(self, id, rev=None, revs_info=False, default=None):
@@ -253,10 +261,10 @@ class Database(object):
 
     def delete(self, doc):
         "Delete the document."
-        if '_rev' not in doc:
-            raise RevisionError("missing '_rev' item in the document")
         if '_id' not in doc:
             raise NotFoundError("missing '_id' item in the document")
+        if '_rev' not in doc:
+            raise RevisionError("missing '_rev' item in the document")
         response = self.server._DELETE(self.name, doc['_id'], 
                                        headers={'If-Match': doc['_rev']})
 
@@ -622,19 +630,23 @@ def get_parser():
                      help='create the database')
     x11.add_argument('--destroy', action='store_true',
                      help='delete the database and all its contents')
-    x11.add_argument('--compact', action='store_true',
-                     help='compact the database; may take some time')
-    x11.add_argument('--view_cleanup', action='store_true',
-                     help='remove view index files no longer required')
+    g1.add_argument('--compact', action='store_true',
+                    help='compact the database; may take some time')
+    g1.add_argument('--compact_design',
+                    help='compact the view indexes for the named design doc')
+    g1.add_argument('--view_cleanup', action='store_true',
+                    help='remove view index files no longer required')
     g1.add_argument('--info', action='store_true',
                      help='output information about the database')
     x12 = g1.add_mutually_exclusive_group()
-    x12.add_argument('--listdesigns', action='store_true',
+    x12.add_argument('--list_designs', action='store_true',
                      help='list design documents for the database')
-    x12.add_argument('--getdesign', metavar='DDOC',
+    x12.add_argument('--get_design', metavar='DDOC',
                      help='get the design document')
-    x12.add_argument('--putdesign', nargs=2, metavar=('DDOC', 'FILEPATH'),
-                     help='put the design document')
+    x12.add_argument('--put_design', nargs=2, metavar=('DDOC', 'FILEPATH'),
+                     help='store the named design document from the file')
+    x12.add_argument('--delete_design', metavar='DDOC',
+                     help='delete the named design document')
     x13 = g1.add_mutually_exclusive_group()
     x13.add_argument('--dump', metavar='FILEPATH',
                      help='create a dump file of the database')
@@ -723,6 +735,8 @@ def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
             verbose(pargs, 'settings read from file', filepath)
         except IOError:
             verbose(pargs, 'Warning: no settings file', filepath)
+        except (ValueError, TypeError):
+            sys.exit('Error: bad settings file', filepath)
     if pargs.server:
         settings['SERVER'] = pargs.server
     if pargs.database:
@@ -744,7 +758,7 @@ def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
 
 def get_database(server, settings):
     if not settings['DATABASE']:
-        sys.exit('error: no database defined')
+        sys.exit('Error: no database defined')
     return server[settings['DATABASE']]
 
 def message(pargs, *args):
@@ -778,6 +792,14 @@ def json_output(pargs, data, else_print=False):
     elif else_print:
         print(json.dumps(data, indent=2))
     return bool(pargs.output)
+
+def json_input(filepath):
+    "Read the JSON document file."
+    try:
+        with open(filepath, 'rb') as infile:
+            return json.load(infile, object_pairs_hook=collections.OrderedDict)
+    except (IOError, ValueError, TypeError) as error:
+        sys.exit("Error: {}".format(error))
 
 def print_dot(*args):
     print('.', sep='', end='')
@@ -815,7 +837,7 @@ def main(pargs, settings):
         if pargs.yes:
             db.destroy()
             message(pargs, 'destroyed database', settings['DATABASE'])
-    elif pargs.compact:
+    if pargs.compact:
         db = get_database(server, settings)
         if pargs.silent:
             db.compact(finish=True)
@@ -824,19 +846,32 @@ def main(pargs, settings):
             sys.stdout.flush()
             db.compact(finish=True, callback=print_dot)
             print()
-    elif pargs.view_cleanup:
+    if pargs.compact_design:
+        get_database(server, settings).compact_design(pargs.compact_design)
+    if pargs.view_cleanup:
         get_database(server, settings).view_cleanup()
 
     if pargs.info:
         doc = get_database(server, settings).get_info()
         json_output(pargs, doc, else_print=True)
 
-    if pargs.listdesigns:
+    if pargs.list_designs:
         data = get_database(server, settings).get_designs()
-        json_output(pargs, data, else_print=True)
-    elif pargs.getdesign:
-        data = get_database(server, settings).get_design(pargs.getdesign)
-        json_output(pargs, data, else_print=True)
+        if not json_output(pargs, data):
+            for row in data['rows']:
+                print(row['id'][len('_design/'):])
+    elif pargs.get_design:
+        doc = get_database(server, settings).get_design(pargs.get_design)
+        json_output(pargs, doc, else_print=True)
+    elif pargs.put_design:
+        doc = json_input(pargs.put_design[1])
+        get_database(server, settings).put_design(pargs.put_design[0], doc)
+        message(pargs, 'stored design', pargs.put_design[0])
+    elif pargs.delete_design:
+        db = get_database(server, settings)
+        doc = db.get_design(pargs.delete_design)
+        db.delete(doc)
+        message(pargs, 'deleted design', pargs.delete_design)
 
     if pargs.put:
         db = get_database(server, settings)
@@ -844,12 +879,7 @@ def main(pargs, settings):
             doc = json.loads(pargs.put,
                              object_pairs_hook=collections.OrderedDict)
         except (ValueError, TypeError): # Arg is filepath to doc
-            try:
-                with open(pargs.put, 'rb') as infile:
-                    doc = json.load(infile,
-                                    object_pairs_hook=collections.OrderedDict)
-            except (IOError, ValueError, TypeError) as error:
-                sys.exit("Error: {}".format(error))
+            doc = json_input(pargs.put)
         db.put(doc)
         message(pargs, 'stored doc', doc['_id'])
     elif pargs.get:
