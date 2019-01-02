@@ -187,7 +187,7 @@ def test_index():
     indexname = 'myindex'
     result = db.load_index(['name'], ddoc=ddocname, name=indexname,
                            selector={'type': 'person'})
-    assert result['id'] == ddocname
+    assert result['id'] == "_design/{}".format(ddocname)
     assert result['name'] == indexname
     result = db.find({'type': 'person'})
     # Does not use an index; warns about that

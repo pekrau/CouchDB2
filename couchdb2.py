@@ -596,8 +596,11 @@ def get_parser():
                    help='indentation level for JSON format output file')
     p.add_argument('-y', '--yes', action='store_true',
                    help='do not ask for confirmation (delete, destroy)')
-    p.add_argument('-v', '--verbose', action='store_true',
+    x = p.add_mutually_exclusive_group()
+    x.add_argument('-v', '--verbose', action='store_true',
                    help='print more information')
+    x.add_argument('-s', '--silent', action='store_true',
+                   help='print no information')
 
     g0 = p.add_argument_group('server operations')
     g0.add_argument('-V', '--version', action='store_true',
@@ -707,9 +710,9 @@ def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
                             settings[key] = data[prefix + key]
                         except KeyError:
                             pass
-            verbosity(pargs, 'settings read from file', filepath)
+            verbose(pargs, 'settings read from file', filepath)
         except IOError:
-            verbosity(pargs, 'Warning: no settings file', filepath)
+            verbose(pargs, 'Warning: no settings file', filepath)
     if pargs.server:
         settings['SERVER'] = pargs.server
     if pargs.database:
@@ -725,8 +728,8 @@ def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
         if settings['PASSWORD'] is None:
             s['PASSWORD'] = None
         else:
-            s['PASSWORD'] = '****'
-        verbosity(pargs, 'settings:', json.dumps(s))
+            s['PASSWORD'] = '***'
+        verbose(pargs, 'settings:', json.dumps(s))
     return settings
 
 def get_database(server, settings):
@@ -734,8 +737,13 @@ def get_database(server, settings):
         sys.exit('error: no database defined')
     return server[settings['DATABASE']]
 
-def verbosity(pargs, *args):
-    "If flag '--verbose' used, print the arguments."
+def message(pargs, *args):
+    "Unless flag '--silent' is used, print the arguments."
+    if pargs.silent: return
+    print(*args)
+
+def verbose(pargs, *args):
+    "If flag '--verbose' is used, then print the arguments."
     if not pargs.verbose: return
     print(*args)
 
@@ -756,7 +764,7 @@ def json_print_output(pargs, data, else_print=True):
         else:
             with open(pargs.output, 'wb') as outfile:
                 json.dump(data, outfile, indent=pargs.indent)
-        verbosity(pargs, 'wrote to file', pargs.output)
+        message(pargs, 'wrote to file', pargs.output)
     else:
         print(json.dumps(data, indent=2))
     return bool(pargs.output)
@@ -787,7 +795,7 @@ def main(pargs, settings):
 
     if pargs.create:
         db = server.create(settings['DATABASE'])
-        verbosity(pargs, 'created database', db)
+        message(pargs, 'created database', db)
     elif pargs.destroy:
         db = get_database(server, settings)
         if not pargs.yes:
@@ -796,7 +804,7 @@ def main(pargs, settings):
                 pargs.yes = True
         if pargs.yes:
             db.destroy()
-            verbosity(pargs, 'destroyed database', settings['DATABASE'])
+            message(pargs, 'destroyed database', settings['DATABASE'])
     elif pargs.compact:
         db = get_database(server, settings)
         db.compact()
@@ -830,12 +838,8 @@ def main(pargs, settings):
                                     object_pairs_hook=collections.OrderedDict)
             except (IOError, ValueError, TypeError) as error:
                 sys.exit("Error: {}".format(error))
-        id = doc.get('_id')
         db.put(doc)
-        if id:
-            verbosity(pargs, 'stored doc', doc['_id'])
-        else:
-            print('stored doc', doc['_id'])
+        message(pargs, 'stored doc', doc['_id'])
     elif pargs.get:
         doc = get_database(server, settings)[pargs.get]
         json_print_output(pargs, doc)
@@ -843,7 +847,7 @@ def main(pargs, settings):
         db = get_database(server, settings)
         doc = db[pargs.delete]
         db.delete(doc)
-        verbosity(pargs, 'deleted doc', doc['_id'])
+        message(pargs, 'deleted doc', doc['_id'])
 
     if pargs.attach:
         db = get_database(server, settings)
@@ -851,23 +855,23 @@ def main(pargs, settings):
         with open(pargs.attach[1], 'rb') as infile:
             db.put_attachment(doc, infile, 
                               filename=os.path.basename(pargs.attach[1]))
-        verbosity(pargs, 
-                  "attached file '{1}' to doc '{0}'".format(*pargs.attach))
+        message(pargs, 
+                "attached file '{1}' to doc '{0}'".format(*pargs.attach))
     elif pargs.detach:
         db = get_database(server, settings)
         doc = db[pargs.detach[0]]
         db.delete_attachment(doc, pargs.detach[1])
-        verbosity(pargs,
-                  "detached file '{1}' from doc '{0}'".format(*pargs.detach))
+        message(pargs,
+                "detached file '{1}' from doc '{0}'".format(*pargs.detach))
     elif pargs.getfile:
         db = get_database(server, settings)
         doc = db[pargs.getfile[0]]
         filepath = pargs.output or pargs.getfile[1]
         with open(filepath, 'wb') as outfile:
             outfile.write(db.get_attachment(doc, pargs.getfile[1]).read())
-        verbosity(pargs,
-                  "wrote file '{0}' from doc '{1}' attachment '{2}'".
-                  format(filepath, *pargs.getfile))
+        message(pargs,
+                "wrote file '{0}' from doc '{1}' attachment '{2}'".
+                format(filepath, *pargs.getfile))
 
     if pargs.view:
         try:
