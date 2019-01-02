@@ -607,7 +607,7 @@ def get_parser():
     p.add_argument('-q', '--password_question', action='store_true',
                    help='ask for the password by interactive input')
     p.add_argument('-o', '--output', metavar='FILEPATH',
-                   help='write output to the given file (usually JSON format)')
+                   help='write output to the given file (JSON format)')
     p.add_argument('--indent', type=int, metavar='INT',
                    help='indentation level for JSON format output file')
     p.add_argument('-y', '--yes', action='store_true',
@@ -656,7 +656,7 @@ def get_parser():
     g2 = p.add_argument_group('document operations')
     x2 = g2.add_mutually_exclusive_group()
     x2.add_argument('-P', '--put', metavar='FILEPATH',
-                    help='store the document given by filepath or explicitly')
+                    help='store the document; from file or argument')
     x2.add_argument('-G', '--get', metavar="DOCID",
                     help='output the document with the given identifier')
     x2.add_argument('--delete', metavar="DOCID",
