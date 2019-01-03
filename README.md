@@ -226,18 +226,18 @@ db.view(designname, viewname, key=None, keys=None, startkey=None, endkey=None,
 Return a [ViewResult](#viewresult) object, containing
 [Row](#row) objects in the list attribute `rows`.
 
-### load_index
+### put_index
 ```python
-db.load_index(fields, ddoc=None, name=None, selector=None)
+db.put_index(fields, ddoc=None, name=None, selector=None)
 ```
-Load a Mango index specification.
+Store a Mango index specification.
 
 - 'fields' is a list of fields to index.
 - 'ddoc' is the design document name. Generated if none given.
 - 'name' is the name of the index. Generated if none given.
 - 'selector' is a partial filter selector, which may be omitted.
 
-Returns dictionary with items 'id' (design document name; sic!),
+Returns a dictionary with items 'id' (design document name; sic!),
 'name' (index name) and 'result' ('created' or 'exists').
 
 ### find
@@ -275,7 +275,7 @@ Delete the attachment. Return the new revision of the document.
 ```python
 db.dump(filepath, callback=None)
 ```
-Dump the entire database to the named tar file.
+Dump the entire database to a tar file.
 
 If defined, the function `callback(ndocs, nfiles)` is called 
 every 100 documents.
@@ -289,7 +289,7 @@ A tuple `(ndocs, nfiles)` is returned.
 ```python
 db.undump(filepath, callback=None)
 ```
-Load the named tar file, which must have been produced by `dump`.
+Load the tar file, which must have been produced by `dump`.
 
 If defined, the function `callback(ndocs, nfiles)` is called 
 every 100 documents.

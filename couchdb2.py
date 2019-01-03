@@ -363,15 +363,15 @@ class Database(object):
                           data.get('offset'),
                           data.get('total_rows'))
 
-    def load_index(self, fields, ddoc=None, name=None, selector=None):
-        """Load a Mango index specification.
+    def put_index(self, fields, ddoc=None, name=None, selector=None):
+        """Store a Mango index specification.
 
         - 'fields' is a list of fields to index.
         - 'ddoc' is the design document name. Generated if none given.
         - 'name' is the name of the index. Generated if none given.
         - 'selector' is a partial filter selector, which may be omitted.
 
-        Returns dictionary with items 'id' (design document identifier; sic!),
+        Returns a dictionary with items 'id' (design document identifier; sic!),
         'name' (index name) and 'result' ('created' or 'exists').
         """
         data = {'index': {'fields': fields}}
@@ -442,7 +442,7 @@ class Database(object):
         return response.json()['rev']
 
     def dump(self, filepath, callback=None):
-        """Dump the entire database to the named tar file.
+        """Dump the entire database to a tar file.
 
         If defined, the function `callback(ndocs, nfiles)` is called 
         every 100 documents.

@@ -4,6 +4,9 @@ Uses package py.test.
 
 from __future__ import print_function
 
+import os
+import tempfile
+
 import pytest
 
 import couchdb2
@@ -177,16 +180,16 @@ def test_index():
     assert len(result['docs']) == 1
     result = db.find({'type': 'house'})
     assert len(result['docs']) == 0
-    # Index for 'name' item
-    db.load_index(['name'])
+    # An index for 'name' item
+    db.put_index(['name'])
     result = db.find({'name': 'Per'})
     assert len(result['docs']) == 2
     assert not result.get('warning')
-    # Load an index having a partial filter selector
+    # An index having a partial filter selector
     ddocname = 'mango'
     indexname = 'myindex'
-    result = db.load_index(['name'], ddoc=ddocname, name=indexname,
-                           selector={'type': 'person'})
+    result = db.put_index(['name'], ddoc=ddocname, name=indexname,
+                          selector={'type': 'person'})
     assert result['id'] == "_design/{}".format(ddocname)
     assert result['name'] == indexname
     result = db.find({'type': 'person'})
@@ -207,7 +210,7 @@ def test_document_attachments():
     id = 'mydoc'
     doc = {'_id': id, 'name': 'myfile', 'contents': 'a Python file'}
     db.put(doc)
-    # Load this file's contents as attachment
+    # Store this file's contents as attachment
     with open(__file__, 'rb') as infile:
         db.put_attachment(doc, infile)
     doc = db[id]
@@ -215,4 +218,30 @@ def test_document_attachments():
     # Check this file's contents against attachment
     with open(__file__, 'rb') as infile:
         assert attfile.read() == infile.read()
+    db.destroy()
+
+def test_dump():
+    db = couchdb2.Server().create(DBNAME)
+    id = 'mydoc'
+    name = 'myfile'
+    doc = {'_id': id, 'name': name, 'contents': 'a Python file'}
+    db.put(doc)
+    # Store this file's contents as attachment
+    with open(__file__, 'rb') as infile:
+        db.put_attachment(doc, infile)
+    f = tempfile.NamedTemporaryFile(delete=False)
+    filepath = f.name
+    f.close()
+    counts1 = db.dump(filepath)
+    db.destroy()
+    db = couchdb2.Server().create(DBNAME)
+    counts2 = db.undump(filepath)
+    os.unlink(filepath)
+    assert counts1 == counts2
+    doc = db[id]
+    assert doc['name'] == name
+    with open(__file__, 'rb') as infile:
+        file_content = infile.read()
+    attachment_content = db.get_attachment(doc, __file__).read()
+    assert file_content == attachment_content
     db.destroy()
