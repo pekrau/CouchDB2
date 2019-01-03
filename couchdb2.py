@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.3.6'
+__version__ = '1.4.0'
 
 import argparse
 import collections
@@ -196,8 +196,16 @@ class Database(object):
         self.server._DELETE(self.name)
 
     def get_info(self):
-        "Return a dictionary containing information about the database."
+        "Return a dictionary with information about the database."
         return self.server._GET(self.name).json()
+
+    def get_security(self):
+        "Return a dictionary with security information for the database."
+        return self.server._GET(self.name, '_security').json()
+
+    def set_security(self, doc):
+        "Set the security information for the database."
+        self.server._PUT(self.name, '_security', json=doc)
 
     def compact(self, finish=False, callback=None):
         """Compact the CouchDB database by rewriting the disk database file
@@ -639,26 +647,32 @@ def get_parser():
     g1.add_argument('--info', action='store_true',
                      help='output information about the database')
     x12 = g1.add_mutually_exclusive_group()
-    x12.add_argument('--list_designs', action='store_true',
-                     help='list design documents for the database')
-    x12.add_argument('--get_design', metavar='DDOC',
-                     help='get the named design document')
-    x12.add_argument('--put_design', nargs=2, metavar=('DDOC', 'FILEPATH'),
-                     help='store the named design document from the file')
-    x12.add_argument('--delete_design', metavar='DDOC',
-                     help='delete the named design document')
+    x12.add_argument('--security', action='store_true',
+                     help='output security information for the database')
+    x12.add_argument('--set_security', metavar='FILEPATH',
+                     help='set security information for the database'
+                     ' from the JSON file')
     x13 = g1.add_mutually_exclusive_group()
-    x13.add_argument('--dump', metavar='FILEPATH',
+    x13.add_argument('--list_designs', action='store_true',
+                     help='list design documents for the database')
+    x13.add_argument('--design', metavar='DDOC',
+                     help='output the named design document')
+    x13.add_argument('--put_design', nargs=2, metavar=('DDOC', 'FILEPATH'),
+                     help='store the named design document from the file')
+    x13.add_argument('--delete_design', metavar='DDOC',
+                     help='delete the named design document')
+    x14 = g1.add_mutually_exclusive_group()
+    x14.add_argument('--dump', metavar='FILEPATH',
                      help='create a dump file of the database')
-    x13.add_argument('--undump', metavar='FILEPATH',
+    x14.add_argument('--undump', metavar='FILEPATH',
                      help='load a dump file into the database')
 
     g2 = p.add_argument_group('document operations')
     x2 = g2.add_mutually_exclusive_group()
-    x2.add_argument('-P', '--put', metavar='FILEPATH',
-                    help='store the document; from file or argument')
     x2.add_argument('-G', '--get', metavar="DOCID",
                     help='output the document with the given identifier')
+    x2.add_argument('-P', '--put', metavar='FILEPATH',
+                    help='store the document; arg is literal doc or filepath')
     x2.add_argument('--delete', metavar="DOCID",
                     help='delete the document with the given identifier')
 
@@ -668,7 +682,7 @@ def get_parser():
                     help='attach the specified file to the given document')
     x3.add_argument('--detach', nargs=2, metavar=('DOCID', 'FILENAME'),
                     help='remove the attached file from the given document')
-    x3.add_argument('--getfile', nargs=2, metavar=('DOCID', 'FILENAME'),
+    x3.add_argument('--get_attach', nargs=2, metavar=('DOCID', 'FILENAME'),
                     help='get the attached file from the given document;'
                     " write to same filepath or that given by '-o'")
 
@@ -852,17 +866,24 @@ def main(pargs, settings):
         get_database(server, settings).view_cleanup()
 
     if pargs.info:
-        doc = get_database(server, settings).get_info()
-        json_output(pargs, doc, else_print=True)
+        db = get_database(server, settings)
+        json_output(pargs, db.get_info(), else_print=True)
+
+    if pargs.security:
+        db = get_database(server, settings)
+        json_output(pargs, db.get_security(), else_print=True)
+    elif pargs.set_security:
+        db = get_database(server, settings)
+        db.set_security(json_input(pargs.set_security))
 
     if pargs.list_designs:
         data = get_database(server, settings).get_designs()
         if not json_output(pargs, data):
             for row in data['rows']:
                 print(row['id'][len('_design/'):])
-    elif pargs.get_design:
-        doc = get_database(server, settings).get_design(pargs.get_design)
-        json_output(pargs, doc, else_print=True)
+    elif pargs.design:
+        db = get_database(server, settings)
+        json_output(pargs, db.get_design(pargs.get_design), else_print=True)
     elif pargs.put_design:
         doc = json_input(pargs.put_design[1])
         get_database(server, settings).put_design(pargs.put_design[0], doc)
@@ -873,7 +894,10 @@ def main(pargs, settings):
         db.delete(doc)
         message(pargs, 'deleted design', pargs.delete_design)
 
-    if pargs.put:
+    if pargs.get:
+        doc = get_database(server, settings)[pargs.get]
+        json_output(pargs, doc, else_print=True)
+    elif pargs.put:
         try:                    # Attempt to interpret arg as explicit doc
             doc = json.loads(pargs.put,
                              object_pairs_hook=collections.OrderedDict)
@@ -881,9 +905,6 @@ def main(pargs, settings):
             doc = json_input(pargs.put)
         get_database(server, settings).put(doc)
         message(pargs, 'stored doc', doc['_id'])
-    elif pargs.get:
-        doc = get_database(server, settings)[pargs.get]
-        json_output(pargs, doc, else_print=True)
     elif pargs.delete:
         db = get_database(server, settings)
         doc = db[pargs.delete]
@@ -894,6 +915,9 @@ def main(pargs, settings):
         db = get_database(server, settings)
         doc = db[pargs.attach[0]]
         with open(pargs.attach[1], 'rb') as infile:
+            # Non-trivial decision: concluded that it is the basename of
+            # the file that is the best identifier for the attachment, 
+            # not the entire filepath.
             db.put_attachment(doc, infile, 
                               filename=os.path.basename(pargs.attach[1]))
         message(pargs, 
@@ -904,15 +928,15 @@ def main(pargs, settings):
         db.delete_attachment(doc, pargs.detach[1])
         message(pargs,
                 "detached file '{1}' from doc '{0}'".format(*pargs.detach))
-    elif pargs.getfile:
+    elif pargs.get_attach:
         db = get_database(server, settings)
-        doc = db[pargs.getfile[0]]
-        filepath = pargs.output or pargs.getfile[1]
+        doc = db[pargs.get_attach[0]]
+        filepath = pargs.output or pargs.get_attach[1]
         with open(filepath, 'wb') as outfile:
-            outfile.write(db.get_attachment(doc, pargs.getfile[1]).read())
+            outfile.write(db.get_attachment(doc, pargs.get_attach[1]).read())
         message(pargs,
                 "wrote file '{0}' from doc '{1}' attachment '{2}'".
-                format(filepath, *pargs.getfile))
+                format(filepath, *pargs.get_attach))
 
     if pargs.view:
         try:

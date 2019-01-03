@@ -129,7 +129,19 @@ Delete this database and all its contents.
 ```python
 db.get_info()
 ```
-Return a dictionary containing information about the database.
+Return a dictionary with information about the database.
+
+### get_security
+```python
+db.get_security()
+```
+Return a dictionary with security information for the database.
+
+### set_security
+```python
+db.set_security(doc)
+```
+Set the security information for the database.
 
 ### compact
 ```python
@@ -259,9 +271,9 @@ of the document.
 
 If no filename, then an attempt is made to get it from content object.
 
-### get_attachment
+### get_attach
 ```python
-db.get_attachment(doc, filename)
+db.get_attach(doc, filename)
 ```
 Return a file-like object containing the content of the attachment.
 
@@ -409,10 +421,11 @@ usage: couchdb2.py [-h] [--settings SETTINGS] [-S SERVER] [-d DATABASE]
                    [--indent INT] [-y] [-v | -s] [-V] [--list]
                    [--create | --destroy] [--compact] [--compact_design DDOC]
                    [--view_cleanup] [--info]
-                   [--list_designs | --get_design DDOC | --put_design DDOC FILEPATH | --delete_design DDOC]
+                   [--security | --set_security FILEPATH]
+                   [--list_designs | --design DDOC | --put_design DDOC FILEPATH | --delete_design DDOC]
                    [--dump FILEPATH | --undump FILEPATH]
-                   [-P FILEPATH | -G DOCID | --delete DOCID]
-                   [--attach DOCID FILEPATH | --detach DOCID FILENAME | --getfile DOCID FILENAME]
+                   [-G DOCID | -P FILEPATH | --delete DOCID]
+                   [--attach DOCID FILEPATH | --detach DOCID FILENAME | --get_attach DOCID FILENAME]
                    [--view SPEC] [--key KEY | --startkey KEY] [--endkey KEY]
                    [--startkey_docid DOCID] [--endkey_docid DOCID] [--group]
                    [--group_level INT] [--noreduce] [--limit INT] [--skip INT]
@@ -434,7 +447,7 @@ optional arguments:
   -q, --password_question
                         ask for the password by interactive input
   -o FILEPATH, --output FILEPATH
-                        write output to the given file (usually JSON format)
+                        write output to the given file (JSON format)
   --indent INT          indentation level for JSON format output file
   -y, --yes             do not ask for confirmation (delete, destroy)
   -v, --verbose         print more information
@@ -452,8 +465,12 @@ database operations:
                         compact the view indexes for the named design doc
   --view_cleanup        remove view index files no longer required
   --info                output information about the database
+  --security            output security information for the database
+  --set_security FILEPATH
+                        set security information for the database from the
+                        JSON file
   --list_designs        list design documents for the database
-  --get_design DDOC     get the named design document
+  --design DDOC         output the named design document
   --put_design DDOC FILEPATH
                         store the named design document from the file
   --delete_design DDOC  delete the named design document
@@ -461,10 +478,10 @@ database operations:
   --undump FILEPATH     load a dump file into the database
 
 document operations:
-  -P FILEPATH, --put FILEPATH
-                        store the document given by filepath or explicitly
   -G DOCID, --get DOCID
                         output the document with the given identifier
+  -P FILEPATH, --put FILEPATH
+                        store the document; arg is literal doc or filepath
   --delete DOCID        delete the document with the given identifier
 
 attachments to document:
@@ -472,7 +489,7 @@ attachments to document:
                         attach the specified file to the given document
   --detach DOCID FILENAME
                         remove the attached file from the given document
-  --getfile DOCID FILENAME
+  --get_attach DOCID FILENAME
                         get the attached file from the given document; write
                         to same filepath or that given by '-o'
 
