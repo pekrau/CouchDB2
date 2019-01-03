@@ -606,7 +606,8 @@ _ERRORS = {
 def get_parser():
     "Get the parser for the command line tool."
     p = argparse.ArgumentParser(description='CouchDB2 command line tool')
-    p.add_argument('--settings', help='settings file in JSON format')
+    p.add_argument('--settings', metavar='FILEPATH',
+                   help='settings file in JSON format')
     p.add_argument('-S', '--server',
                    help='CouchDB server URL, including port number')
     p.add_argument('-d', '--database', help='database to operate on')

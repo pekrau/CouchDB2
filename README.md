@@ -415,12 +415,12 @@ sources (if existing):
    ```
 2) From JSON file `~/.couchdb2`
 3) From JSON file `settings.json` (in the current working directory).
-4) From JSON file `--settings file`, if given.
+4) From the file given by command line option `--settings FILEPATH`.
 
 Available command options:
 
 ```
-usage: couchdb2.py [-h] [--settings SETTINGS] [-S SERVER] [-d DATABASE]
+usage: couchdb2.py [-h] [--settings FILEPATH] [-S SERVER] [-d DATABASE]
                    [-u USERNAME] [-p PASSWORD] [-q] [-o FILEPATH]
                    [--indent INT] [-y] [-v | -s] [-V] [--list]
                    [--create | --destroy] [--compact] [--compact_design DDOC]
