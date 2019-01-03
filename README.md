@@ -395,7 +395,11 @@ Alias for field number 2
 
 ## Command line tool
 
-Interact with the CouchDB server via the command line.
+The module is also a command line tool for interacting with the CouchDB server.
+
+```
+$ python couchdb2.py -h
+```
 
 Settings for the command line tool are updated in order from the following
 sources (if existing):
