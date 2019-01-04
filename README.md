@@ -393,6 +393,14 @@ Alias for field number 1
 ### total_rows
 Alias for field number 2
 
+## get_settings
+```python
+get_settings(filepath, settings=None)
+```
+Get the settings lookup from a JSON format file.
+If `settings` is given, then output an updated copy of it,
+else update the default settings.
+
 ## Command line tool
 
 The module is also a command line tool for interacting with the CouchDB server.
@@ -420,7 +428,7 @@ sources (if existing):
 Available command options:
 
 ```
-usage: couchdb2.py [-h] [--settings FILEPATH] [-S SERVER] [-d DATABASE]
+usage: couchdb2.py [-h] [--settings SETTINGS] [-S SERVER] [-d DATABASE]
                    [-u USERNAME] [-p PASSWORD] [-q] [-o FILEPATH]
                    [--indent INT] [-y] [-v | -s] [-V] [--list]
                    [--create | --destroy] [--compact] [--compact_design DDOC]

@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.5.0'
+__version__ = '1.5.1'
 
 import argparse
 import collections
@@ -619,7 +619,10 @@ DEFAULT_SETTINGS = {
 }
 
 def get_settings(filepath, settings=None):
-    "Get or update the settings lookup from a JSON format file."
+    """Get the settings lookup from a JSON format file.
+    If `settings` is given, then output an updated copy of it,
+    else update the default settings.
+    """
     if settings:
         result = settings.copy()
     else:
