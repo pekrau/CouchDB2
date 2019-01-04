@@ -383,13 +383,13 @@ class Database(object):
     def put_index(self, fields, ddoc=None, name=None, selector=None):
         """Store a Mango index specification.
 
-        - 'fields' is a list of fields to index.
-        - 'ddoc' is the design document name. Generated if none given.
-        - 'name' is the name of the index. Generated if none given.
-        - 'selector' is a partial filter selector, which may be omitted.
+        - `fields` is a list of fields to index.
+        - `ddoc` is the design document name. Generated if none given.
+        - `name` is the name of the index. Generated if none given.
+        - `selector` is a partial filter selector, which may be omitted.
 
-        Returns a dictionary with items 'id' (design document identifier; sic!),
-        'name' (index name) and 'result' ('created' or 'exists').
+        Returns a dictionary with items `id` (design document identifier; sic!),
+        `name` (index name) and `result` (`created` or `exists`).
         """
         data = {'index': {'fields': fields}}
         if ddoc is not None:
@@ -405,8 +405,8 @@ class Database(object):
              use_index=None, bookmark=None, update=None):
         """Select documents according to the selector.
 
-        Returns a dictionary with items 'docs', 'warning', 'execution_stats'
-        and 'bookmark'.
+        Returns a dictionary with items `docs`, `warning`, `execution_stats`
+        and `bookmark`.
         """
         data = {'selector': selector}
         if limit is not None:
@@ -433,7 +433,7 @@ class Database(object):
         return io.BytesIO(response.content)
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
-        """'content' is a string or a file-like object. Return the new
+        """`content` is a string or a file-like object. Return the new
         revision of the document.
 
         If no filename, then an attempt is made to get it from content object.

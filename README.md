@@ -250,13 +250,13 @@ db.put_index(fields, ddoc=None, name=None, selector=None)
 ```
 Store a Mango index specification.
 
-- 'fields' is a list of fields to index.
-- 'ddoc' is the design document name. Generated if none given.
-- 'name' is the name of the index. Generated if none given.
-- 'selector' is a partial filter selector, which may be omitted.
+- `fields` is a list of fields to index.
+- `ddoc` is the design document name. Generated if none given.
+- `name` is the name of the index. Generated if none given.
+- `selector` is a partial filter selector, which may be omitted.
 
-Returns a dictionary with items 'id' (design document name; sic!),
-'name' (index name) and 'result' ('created' or 'exists').
+Returns a dictionary with items `id` (design document name; sic!),
+`name` (index name) and `result` (`created` or `exists`).
 
 ### find
 ```python
@@ -265,8 +265,8 @@ db.find(selector, use_index=None, limit=None, skip=None, sort=None,
 ```
 Select documents according to the Mango index selector.
 
-Returns a dictionary with items 'docs', 'warning', 'execution_stats'
-and 'bookmark'.
+Returns a dictionary with items `docs`, `warning`, `execution_stats`
+and `bookmark`.
 
 ### get_attachment
 ```python
@@ -278,7 +278,7 @@ Return a file-like object containing the content of the attachment.
 ```python
 db.put_attachment(doc, content, filename=None, content_type=None)
 ```
-'content' is a string or a file-like object. Return the new revision
+`content` is a string or a file-like object. Return the new revision
 of the document.
 
 If no filename, then an attempt is made to get it from content object.
@@ -341,7 +341,7 @@ Could not create the entity; it exists already.
 ```python
 RevisionError()
 ```
-Wrong or missing '_rev' item in the document to save.
+Wrong or missing `_rev` item in the document to save.
 ## AuthorizationError
 ```python
 AuthorizationError()
@@ -351,7 +351,7 @@ Current user not authorized to perform the operation.
 ```python
 ContentTypeError()
 ```
-Bad 'Content-Type' value in the request.
+Bad `Content-Type` value in the request.
 ## ServerError
 ```python
 ServerError()
