@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.5.1'
+__version__ = '1.5.2'
 
 import argparse
 import collections
@@ -32,7 +32,9 @@ class Server(object):
     def __init__(self, href='http://localhost:5984/',
                  username=None, password=None, session=True):
         """Connect to the CouchDB server.
-        If `session` is true, then set up an authenticated session.
+
+        If `session` is true, then an authenticated session is set up.
+        By default, its lifetime is 10 minutes.
         """
         self.href = href.rstrip('/') + '/'
         self.username = username
@@ -285,7 +287,7 @@ class Database(object):
                                        headers={'If-Match': doc['_rev']})
 
     def get_designs(self):
-        "Get the design documents for the database."
+        "Return the design documents for the database."
         return self.server._GET(self.name, '_design_docs').json()
 
     def get_design(self, designname):
@@ -425,6 +427,12 @@ class Database(object):
         response = self.server._POST(self.name, '_find', json=data)
         return response.json(object_pairs_hook=collections.OrderedDict)
 
+    def get_attachment(self, doc, filename):
+        "Return a file-like object containing the content of the attachment."
+        response = self.server._GET(self.name, doc['_id'], filename,
+                                    headers={'If-Match': doc['_rev']})
+        return io.BytesIO(response.content)
+
     def put_attachment(self, doc, content, filename=None, content_type=None):
         """'content' is a string or a file-like object. Return the new
         revision of the document.
@@ -444,12 +452,6 @@ class Database(object):
                                     headers={'Content-Type': content_type,
                                              'If-Match': doc['_rev']})
         return response.json()['rev']
-
-    def get_attachment(self, doc, filename):
-        "Return a file-like object containing the content of the attachment."
-        response = self.server._GET(self.name, doc['_id'], filename,
-                                    headers={'If-Match': doc['_rev']})
-        return io.BytesIO(response.content)
 
     def delete_attachment(self, doc, filename):
         "Delete the attachment. Return the new revision of the document."
@@ -797,12 +799,12 @@ def get_database(server, settings):
     return server[settings['DATABASE']]
 
 def message(pargs, *args):
-    "Unless flag '--silent' is used, print the arguments."
+    "Unless flag '--silent' was used, print the arguments."
     if pargs.silent: return
     print(*args)
 
 def verbose(pargs, *args):
-    "If flag '--verbose' is used, then print the arguments."
+    "If flag '--verbose' was used, then print the arguments."
     if not pargs.verbose: return
     print(*args)
 

@@ -14,9 +14,13 @@ $ pip install [-e] git+https://github.com/pekrau/CouchDB2.git#egg=couchdb2
 
 ## Server
 ```python
-server = Server(href='http://localhost:5984/', username=None, password=None)
+server = Server(href='http://localhost:5984/', username=None, password=None, session=True)
 ```
-A connection to the CouchDB server.
+Connect to the CouchDB server.
+
+If `session` is true, then an authenticated session is set up.
+By default, its lifetime is 10 minutes.
+
 ### \_\_str\_\_
 ```python
 str(server)
@@ -91,7 +95,7 @@ Does a document with the given id exist in the database?
 
 ### \_\_iter\_\_
 ```python
-iter(db)
+for doc in db: ...
 ```
 Iterate over all documents in the database.
 
@@ -154,6 +158,12 @@ If `finish` is True, then return only when compaction is done.
 In addition, if defined, the function `callback(seconds)` is called
 every second until compaction is done.
 
+### compact
+```python
+db.compact_design(designname)
+```
+Compact the view indexes associated with the named design document.
+
 ### view_cleanup
 ```python
 db.view_cleanup()
@@ -187,7 +197,7 @@ Delete the document.
 ```python
 db.get_designs()
 ```
-Get the design documents for the database.
+Return the design documents for the database.
 
 ### get_design
 ```python
@@ -221,12 +231,6 @@ Example of doc:
 ```
 
 More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
-
-### compact_design
-```python
-db.compact_design(designname)
-```
-Compact the view indexes associated with the named design document.
 
 ### view
 ```python
@@ -262,6 +266,12 @@ Select documents according to the Mango index selector.
 Returns a dictionary with items 'docs', 'warning', 'execution_stats'
 and 'bookmark'.
 
+### get_attachment
+```python
+db.get_attachment(doc, filename)
+```
+Return a file-like object containing the content of the attachment.
+
 ### put_attachment
 ```python
 db.put_attachment(doc, content, filename=None, content_type=None)
@@ -270,12 +280,6 @@ db.put_attachment(doc, content, filename=None, content_type=None)
 of the document.
 
 If no filename, then an attempt is made to get it from content object.
-
-### get_attach
-```python
-db.get_attach(doc, filename)
-```
-Return a file-like object containing the content of the attachment.
 
 ### delete_attachment
 ```python
