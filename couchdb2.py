@@ -5,7 +5,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.4.0'
+__version__ = '1.5.0'
 
 import argparse
 import collections
@@ -30,15 +30,23 @@ class Server(object):
     "A connection to the CouchDB server."
 
     def __init__(self, href='http://localhost:5984/',
-                 username=None, password=None):
-        "Connect to the CouchDB server."
+                 username=None, password=None, session=True):
+        """Connect to the CouchDB server.
+        If `session` is true, then set up an authenticated session.
+        """
         self.href = href.rstrip('/') + '/'
         self.username = username
         self.password = password
         self._session = requests.Session()
-        if self.username and self.password:
-            self._session.auth = (self.username, self.password)
         self._session.headers.update({'Accept': JSON_MIME})
+        self.user_context = {}
+        if self.username and self.password:
+            if session:
+                self._POST('_session', 
+                           data={'name': username, 'password': password})
+                self.user_context = self._GET('_session').json()
+            else:
+                self._session.auth = (self.username, self.password)
         self.version = self._GET().json()['version']
 
     def __str__(self):
@@ -603,6 +611,29 @@ _ERRORS = {
     500: ServerError}
 
 
+DEFAULT_SETTINGS = {
+    'SERVER': 'http://localhost:5984',
+    'DATABASE': None,
+    'USERNAME': None,
+    'PASSWORD': None
+}
+
+def get_settings(filepath, settings=None):
+    "Get or update the settings lookup from a JSON format file."
+    if settings:
+        result = settings.copy()
+    else:
+        result = DEFAULT_SETTINGS.copy()
+    with open(os.path.expanduser(filepath), 'rb') as infile:
+        data = json.load(infile)
+        for key in DEFAULT_SETTINGS:
+            for prefix in ['', 'COUCHDB_', 'COUCHDB2_']:
+                try:
+                    result[key] = data[prefix + key]
+                except KeyError:
+                    pass
+    return result
+
 def get_parser():
     "Get the parser for the command line tool."
     p = argparse.ArgumentParser(description='CouchDB2 command line tool')
@@ -718,35 +749,21 @@ def get_parser():
     return p
 
 
-DEFAULT_SETTINGS = {
-    'SERVER': 'http://localhost:5984',
-    'DATABASE': None,
-    'USERNAME': None,
-    'PASSWORD': None
-}
-
-def get_settings(pargs, filepaths=['~/.couchdb2', 'settings.json']):
-    """Get the settings lookup.
+def get_settings_cmd(pargs, filepaths=['~/.couchdb2', 'settings.json']):
+    """Get the settings lookup for the command line tool.
     1) Initialize with default settings.
     2) Update with values in JSON file '~/.couchdb2', if any.
     3) Update with values in JSON file 'settings.json' (current dir), if any.
     4) Update with values in the explicitly given settings file, if any.
     5) Modify by any command line arguments.
     """
-    settings = DEFAULT_SETTINGS.copy()
+    settings = None
     filepaths = filepaths[:]
     if pargs.settings:
         filepaths.append(pargs.settings)
     for filepath in filepaths:
         try:
-            with open(os.path.expanduser(filepath), 'rb') as infile:
-                data = json.load(infile)
-                for key in settings:
-                    for prefix in ['', 'COUCHDB_', 'COUCHDB2_']:
-                        try:
-                            settings[key] = data[prefix + key]
-                        except KeyError:
-                            pass
+            settings = get_settings(filepath, settings=settings)
             verbose(pargs, 'settings read from file', filepath)
         except IOError:
             verbose(pargs, 'Warning: no settings file', filepath)
@@ -831,6 +848,8 @@ def main(pargs, settings):
     server = Server(href=settings['SERVER'],
                     username=settings['USERNAME'],
                     password=settings['PASSWORD'])
+    if pargs.verbose and server.user_context:
+        print('user context:', server.user_context)
     if pargs.version:
         if not json_output(pargs, server.version):
             print(server.version)
@@ -989,7 +1008,7 @@ if __name__ == '__main__':
     try:
         parser = get_parser()
         pargs = parser.parse_args()
-        settings = get_settings(pargs)
+        settings = get_settings_cmd(pargs)
         main(pargs, settings)
     except CouchDB2Exception as error:
         sys.exit("Error: {}".format(error))

@@ -1,6 +1,6 @@
 {
   "SERVER": "http://localhost:5984",
   "DATABASE": "test",
-  "USERNAME": null,
-  "PASSWORD": null
+  "USERNAME": "admin",
+  "PASSWORD": "abc123"
 }

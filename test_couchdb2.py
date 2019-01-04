@@ -11,11 +11,21 @@ import pytest
 
 import couchdb2
 
-
+server = None
 DBNAME = 'pytest'
 
+def setup_module(module):
+    "Read the settings file only once."
+    global server
+    try:
+        settings = couchdb2.get_settings('settings.json')
+        server = couchdb2.Server(username=settings['USERNAME'],
+                                 password=settings['PASSWORD'])
+    except IOError:
+        server = couchdb2.Server()
+
 def test_server():
-    server = couchdb2.Server()
+    global server
     # Verified connection
     assert server.version
     # Cannot connect to nonsense address
@@ -23,7 +33,6 @@ def test_server():
         server = couchdb2.Server('http://localhost:123456/')
 
 def test_database():
-    server = couchdb2.Server()
     # Keep track of how many databases to start with
     count = len(server)
     # Make sure the test database is not present
@@ -46,7 +55,7 @@ def test_database():
     assert len(server) == count
 
 def test_document_create():
-    db = couchdb2.Server().create(DBNAME)
+    db = server.create(DBNAME)
     # Empty database
     assert len(db) == 0
     # Store a document with predefined id
@@ -74,7 +83,6 @@ def test_document_create():
     db.destroy()
 
 def test_document_update():
-    server = couchdb2.Server()
     db = server.create(DBNAME)
     assert len(db) == 0
     doc = {'name': 'Per', 'age': 59, 'mood': 'jolly'}
@@ -99,7 +107,7 @@ def test_document_update():
     db.destroy()
 
 def test_design_view():
-    db = couchdb2.Server().create(DBNAME)
+    db = server.create(DBNAME)
     db.put_design('docs',
                   {'views':
                    {'name':
@@ -150,7 +158,7 @@ def test_design_view():
     db.destroy()
 
 def test_iterator():
-    db = couchdb2.Server().create(DBNAME)
+    db = server.create(DBNAME)
     orig = {'field': 'data'}
     # One more than chunk size to test paging
     N = couchdb2.Database.CHUNK_SIZE + 1
@@ -166,7 +174,6 @@ def test_iterator():
 
 def test_index():
     "Mango index; only for CouchDB version 2 and higher."
-    server = couchdb2.Server()
     if not server.version.startswith('2'): return
     db = server.create(DBNAME)
     db.put({'name': 'Per', 'type': 'person', 'content': 'stuff'})
@@ -206,7 +213,7 @@ def test_index():
     db.destroy()
 
 def test_document_attachments():
-    db = couchdb2.Server().create(DBNAME)
+    db = server.create(DBNAME)
     id = 'mydoc'
     doc = {'_id': id, 'name': 'myfile', 'contents': 'a Python file'}
     db.put(doc)
@@ -221,7 +228,7 @@ def test_document_attachments():
     db.destroy()
 
 def test_dump():
-    db = couchdb2.Server().create(DBNAME)
+    db = server.create(DBNAME)
     id = 'mydoc'
     name = 'myfile'
     doc = {'_id': id, 'name': name, 'contents': 'a Python file'}
@@ -234,7 +241,7 @@ def test_dump():
     f.close()
     counts1 = db.dump(filepath)
     db.destroy()
-    db = couchdb2.Server().create(DBNAME)
+    db = server.create(DBNAME)
     counts2 = db.undump(filepath)
     os.unlink(filepath)
     assert counts1 == counts2
