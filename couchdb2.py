@@ -175,7 +175,7 @@ class Database(object):
         return response.status_code in (200, 304)
 
     def __iter__(self):
-        "Iterate over all documents in the database."
+        "Return an iterator over all documents in the database."
         return _DatabaseIterator(self, chunk_size=self.CHUNK_SIZE)
 
     def __getitem__(self, id):

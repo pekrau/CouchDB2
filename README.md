@@ -35,7 +35,7 @@ Return the number of user-defined databases.
 
 ### \_\_iter\_\_
 ```python
-iter(server)
+for db in server: ...
 ```
 Return an iterator over all user-defined databases on the server.
 
@@ -97,7 +97,7 @@ Does a document with the given id exist in the database?
 ```python
 for doc in db: ...
 ```
-Iterate over all documents in the database.
+Return an iterator over all documents in the database.
 
 ### \_\_getitem\_\_
 ```python
