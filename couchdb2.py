@@ -5,8 +5,9 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.5.2'
+__version__ = '1.5.3'
 
+# Standard packages
 import argparse
 import collections
 import getpass
@@ -20,6 +21,7 @@ import tarfile
 import time
 import uuid
 
+# Third-party package.
 import requests
 
 JSON_MIME = 'application/json'
@@ -596,7 +598,6 @@ class ContentTypeError(CouchDB2Exception):
 class ServerError(CouchDB2Exception):
     "Internal server error."
 
-
 _ERRORS = {
     200: None,
     201: None,
@@ -612,32 +613,6 @@ _ERRORS = {
     500: ServerError}
 
 
-DEFAULT_SETTINGS = {
-    'SERVER': 'http://localhost:5984',
-    'DATABASE': None,
-    'USERNAME': None,
-    'PASSWORD': None
-}
-
-def get_settings(filepath, settings=None):
-    """Get the settings lookup from a JSON format file.
-    If `settings` is given, then output an updated copy of it,
-    else update the default settings.
-    """
-    if settings:
-        result = settings.copy()
-    else:
-        result = DEFAULT_SETTINGS.copy()
-    with open(os.path.expanduser(filepath), 'rb') as infile:
-        data = json.load(infile)
-        for key in DEFAULT_SETTINGS:
-            for prefix in ['', 'COUCHDB_', 'COUCHDB2_']:
-                try:
-                    result[key] = data[prefix + key]
-                except KeyError:
-                    pass
-    return result
-
 def get_parser():
     "Get the parser for the command line tool."
     p = argparse.ArgumentParser(description='CouchDB2 command line tool')
@@ -647,20 +622,21 @@ def get_parser():
                    help='CouchDB server URL, including port number')
     p.add_argument('-d', '--database', help='database to operate on')
     p.add_argument('-u', '--username', help='CouchDB user account name')
-    p.add_argument('-p', '--password', help='CouchDB user account password')
-    p.add_argument('-q', '--password_question', action='store_true',
-                   help='ask for the password by interactive input')
+    x01 = p.add_mutually_exclusive_group()
+    x01.add_argument('-p', '--password', help='CouchDB user account password')
+    x01.add_argument('-q', '--password_question', action='store_true',
+                     help='ask for the password by interactive input')
     p.add_argument('-o', '--output', metavar='FILEPATH',
                    help='write output to the given file (JSON format)')
     p.add_argument('--indent', type=int, metavar='INT',
                    help='indentation level for JSON format output file')
     p.add_argument('-y', '--yes', action='store_true',
                    help='do not ask for confirmation (delete, destroy)')
-    x = p.add_mutually_exclusive_group()
-    x.add_argument('-v', '--verbose', action='store_true',
-                   help='print more information')
-    x.add_argument('-s', '--silent', action='store_true',
-                   help='print no information')
+    x02 = p.add_mutually_exclusive_group()
+    x02.add_argument('-v', '--verbose', action='store_true',
+                     help='print more information')
+    x02.add_argument('-s', '--silent', action='store_true',
+                     help='print no information')
 
     g0 = p.add_argument_group('server operations')
     g0.add_argument('-V', '--version', action='store_true',
@@ -753,21 +729,20 @@ def get_parser():
     return p
 
 
-def get_settings_cmd(pargs, filepaths=['~/.couchdb2', 'settings.json']):
+def get_settings(pargs):
     """Get the settings lookup for the command line tool.
-    1) Initialize with default settings.
-    2) Update with values in JSON file '~/.couchdb2', if any.
-    3) Update with values in JSON file 'settings.json' (current dir), if any.
-    4) Update with values in the explicitly given settings file, if any.
-    5) Modify by any command line arguments.
+    1) Initialize with DEFAULT_SETTINGS
+    2) Update with values in JSON file in DEFAULT_SETTINGS_FILEPATHS, if any.
+    3) Update with values in the explicitly given settings file, if any.
+    4) Modify by any command line arguments.
     """
     settings = None
-    filepaths = filepaths[:]
+    filepaths = DEFAULT_SETTINGS_FILEPATHS[:]
     if pargs.settings:
         filepaths.append(pargs.settings)
     for filepath in filepaths:
         try:
-            settings = get_settings(filepath, settings=settings)
+            settings = read_settings(filepath, settings=settings)
             verbose(pargs, 'settings read from file', filepath)
         except IOError:
             verbose(pargs, 'Warning: no settings file', filepath)
@@ -792,7 +767,36 @@ def get_settings_cmd(pargs, filepaths=['~/.couchdb2', 'settings.json']):
         verbose(pargs, 'settings:', json.dumps(s))
     return settings
 
+DEFAULT_SETTINGS = {
+    'SERVER': 'http://localhost:5984',
+    'DATABASE': None,
+    'USERNAME': None,
+    'PASSWORD': None
+}
+
+DEFAULT_SETTINGS_FILEPATHS = ['~/.couchdb2', 'settings.json']
+
+def read_settings(filepath, settings=None):
+    """Read the settings lookup from a JSON format file.
+    If `settings` is given, then output an updated copy of it,
+    else copy the default settings and output an update of it.
+    """
+    if settings:
+        result = settings.copy()
+    else:
+        result = DEFAULT_SETTINGS.copy()
+    with open(os.path.expanduser(filepath), 'rb') as infile:
+        data = json.load(infile)
+        for key in DEFAULT_SETTINGS:
+            for prefix in ['', 'COUCHDB_', 'COUCHDB2_']:
+                try:
+                    result[key] = data[prefix + key]
+                except KeyError:
+                    pass
+    return result
+
 def get_database(server, settings):
+    "Get the database defined in the settings,"
     if not settings['DATABASE']:
         sys.exit('Error: no database defined')
     return server[settings['DATABASE']]
@@ -838,17 +842,16 @@ def json_input(filepath):
         sys.exit("Error: {}".format(error))
 
 def print_dot(*args):
+    "Print a dot without a newline and flush immediately."
     print('.', sep='', end='')
     sys.stdout.flush()
 
-def main(pargs, settings):
-    "CouchDB2 command line tool."
+def execute(pargs, settings):
+    "Execution of the CouchDB2 command line tool."
     try:
         input = raw_input
     except NameError:
         pass
-    if pargs.password_question:
-        settings['PASSWORD'] = getpass.getpass('password > ')
     server = Server(href=settings['SERVER'],
                     username=settings['USERNAME'],
                     password=settings['PASSWORD'])
@@ -875,6 +878,7 @@ def main(pargs, settings):
         if pargs.yes:
             db.destroy()
             message(pargs, "destroyed database '{}".format(db))
+
     if pargs.compact:
         db = get_database(server, settings)
         if pargs.silent:
@@ -1007,12 +1011,20 @@ def main(pargs, settings):
             print()
             print('undumped', ndocs, 'documents,', nfiles, 'files')
 
-
-if __name__ == '__main__':
+def main():
+    "Entry point for the CouchDB2 command line tool."
     try:
         parser = get_parser()
         pargs = parser.parse_args()
-        settings = get_settings_cmd(pargs)
-        main(pargs, settings)
+        if len(sys.argv) == 1:
+            parser.print_usage()
+        settings = get_settings(pargs)
+        if pargs.password_question:
+            settings['PASSWORD'] = getpass.getpass('password > ')
+        execute(pargs, settings)
     except CouchDB2Exception as error:
         sys.exit("Error: {}".format(error))
+
+
+if __name__ == '__main__':
+    main()
