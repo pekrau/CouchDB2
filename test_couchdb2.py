@@ -237,8 +237,8 @@ def test_dump():
     # Store this file's contents as attachment
     with open(__file__, 'rb') as infile:
         db.put_attachment(doc1, infile)
-    id2 = 'åöä'
-    name2 = 'Åkersjöö'.decode('utf-8') # XXX
+    id2 = u'åöä'
+    name2 = u'Åkersjöö'
     doc2 = {'_id': id2, 'name': name2, 'contents': 'ũber unter vor'}
     db.put(doc2)
     f = tempfile.NamedTemporaryFile(delete=False)
