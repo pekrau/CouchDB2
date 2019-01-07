@@ -1,11 +1,12 @@
-"""Slim Python interface module for CouchDB v2.x.
+# -*- coding: utf-8 -*-
+"""Slim Python interface module for CouchDB v2.x. Also a command line tool.
 
 Relies on requests: http://docs.python-requests.org/en/master/
 """
 
 from __future__ import print_function
 
-__version__ = '1.5.3'
+__version__ = '1.5.4'
 
 # Standard packages
 import argparse
@@ -257,7 +258,7 @@ class Database(object):
         if rev is not None:
             params['rev'] = rev
         if revs_info:
-            params['revs_info'] = json.dumps(True)
+            params['revs_info'] = jsons(True)
         response = self.server._GET(self.name, id,
                                     errors={404: None}, params=params)
         if response.status_code == 404:
@@ -351,29 +352,29 @@ class Database(object):
         """
         params = {}
         if startkey is not None:
-            params['startkey'] = json.dumps(startkey)
+            params['startkey'] = jsons(startkey)
         if key is not None:
-            params['key'] = json.dumps(key)
+            params['key'] = jsons(key)
         if keys is not None:
-            params['keys'] = json.dumps(keys)
+            params['keys'] = jsons(keys)
         if endkey is not None:
-            params['endkey'] = json.dumps(endkey)
+            params['endkey'] = jsons(endkey)
         if skip is not None:
-            params['skip'] = json.dumps(skip)
+            params['skip'] = jsons(skip)
         if limit is not None:
-            params['limit'] = json.dumps(limit)
+            params['limit'] = jsons(limit)
         if not sorted:
-            params['sorted'] = json.dumps(False)
+            params['sorted'] = jsons(False)
         if descending:
-            params['descending'] = json.dumps(True)
+            params['descending'] = jsons(True)
         if group:
-            params['group'] = json.dumps(True)
+            params['group'] = jsons(True)
         if group_level is not None:
-            params['group_level'] = json.dumps(group_level)
+            params['group_level'] = jsons(group_level)
         if reduce is not None:
-            params['reduce'] = json.dumps(bool(reduce))
+            params['reduce'] = jsons(bool(reduce))
         if include_docs:
-            params['include_docs'] = json.dumps(True)
+            params['include_docs'] = jsons(True)
         response = self.server._GET(self.name, '_design', designname, '_view',
                                     viewname, params=params)
         data = response.json()
@@ -480,13 +481,13 @@ class Database(object):
         with tarfile.open(filepath, mode=mode) as outfile:
             for doc in self:
                 info = tarfile.TarInfo(doc['_id'])
-                data = json.dumps(doc)
+                data = jsons(doc).encode('utf-8')
                 info.size = len(data)
                 outfile.addfile(info, io.BytesIO(data))
                 ndocs += 1
                 # Attachments must follow their document.
                 for attname in doc.get('_attachments', dict()):
-                    info = tarfile.TarInfo("{0}_att/{1}".format(
+                    info = tarfile.TarInfo(u"{0}_att/{1}".format(
                         doc['_id'], attname))
                     attfile = self.get_attachment(doc, attname)
                     if attfile is None:
@@ -508,7 +509,8 @@ class Database(object):
         every 100 documents.
 
         NOTE: The documents are just added to the database, ignoring any
-        `_rev` items. This implies that they may not already exist.
+        `_rev` items. This means that no document with the same identifier
+        must exist in the database.
 
         A tuple (ndocs, nfiles) is returned.
         """
@@ -525,14 +527,14 @@ class Database(object):
                     self.put_attachment(doc, itemdata, **atts.pop(item.name))
                     nfiles += 1
                 else:
-                    doc = json.loads(itemdata, 
+                    doc = json.loads(itemdata.decode('utf-8'),
                                      object_pairs_hook=collections.OrderedDict)
                     doc.pop('_rev', None)
                     atts = doc.pop('_attachments', dict())
                     self.put(doc)
                     ndocs += 1
                     for attname, attinfo in atts.items():
-                        key = "{0}_att/{1}".format(doc['_id'], attname)
+                        key = u"{0}_att/{1}".format(doc['_id'], attname)
                         atts[key] = dict(filename=attname,
                                          content_type=attinfo['content_type'])
                 if ndocs % 100 == 0 and callback:
@@ -611,6 +613,10 @@ _ERRORS = {
     412: CreationError,
     415: ContentTypeError,
     500: ServerError}
+
+def jsons(data, indent=None):
+    "Convert data into JSON string."
+    return json.dumps(data, ensure_ascii=False, indent=indent)
 
 
 def get_parser():
@@ -764,7 +770,7 @@ def get_settings(pargs):
             s['PASSWORD'] = None
         else:
             s['PASSWORD'] = '***'
-        verbose(pargs, 'settings:', json.dumps(s))
+        verbose(pargs, 'settings:', jsons(s))
     return settings
 
 DEFAULT_SETTINGS = {
@@ -823,20 +829,22 @@ def json_output(pargs, data, else_print=False):
     """
     if pargs.output:
         if pargs.output.endswith('.gz'):
-            with gzip.open(pargs.output, 'wb') as outfile:
-                json.dump(data, outfile, indent=pargs.indent)
+            with gzip.open(pargs.output, 'w') as outfile:
+                js = json.dumps(data, ensure_ascii=False, indent=pargs.indent)
+                outfile.write(js.encode('utf-8'))
         else:
-            with open(pargs.output, 'wb') as outfile:
-                json.dump(data, outfile, indent=pargs.indent)
+            with io.open(pargs.output, 'w', encoding='utf-8') as outfile:
+                js = json.dumps(data, ensure_ascii=False, indent=pargs.indent)
+                outfile.write(unicode(js))
         verbose(pargs, 'wrote JSON to file', pargs.output)
     elif else_print:
-        print(json.dumps(data, indent=2))
+        print(jsons(data, indent=2))
     return bool(pargs.output)
 
 def json_input(filepath):
     "Read the JSON document file."
     try:
-        with open(filepath, 'rb') as infile:
+        with open(filepath, 'r') as infile:
             return json.load(infile, object_pairs_hook=collections.OrderedDict)
     except (IOError, ValueError, TypeError) as error:
         sys.exit("Error: {}".format(error))
@@ -923,7 +931,7 @@ def execute(pargs, settings):
         message(pargs, 'deleted design', pargs.delete_design)
 
     if pargs.get:
-        doc = get_database(server, settings)[pargs.get]
+        doc = get_database(server, settings)[pargs.get.decode('utf-8')]
         json_output(pargs, doc, else_print=True)
     elif pargs.put:
         try:                    # Attempt to interpret arg as explicit doc

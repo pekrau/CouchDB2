@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Test the Python interface module to CouchDB v2.x.
 Uses package py.test.
 """
@@ -18,7 +19,7 @@ def setup_module(module):
     "Read the settings file only once."
     global server
     try:
-        settings = couchdb2.get_settings('settings.json')
+        settings = couchdb2.read_settings('settings.json')
         server = couchdb2.Server(username=settings['USERNAME'],
                                  password=settings['PASSWORD'])
     except IOError:
@@ -229,13 +230,17 @@ def test_document_attachments():
 
 def test_dump():
     db = server.create(DBNAME)
-    id = 'mydoc'
-    name = 'myfile'
-    doc = {'_id': id, 'name': name, 'contents': 'a Python file'}
-    db.put(doc)
+    id1 = 'mydoc'
+    name1 = 'myfile'
+    doc1 = {'_id': id1, 'name': name1, 'contents': 'a Python file'}
+    db.put(doc1)
     # Store this file's contents as attachment
     with open(__file__, 'rb') as infile:
-        db.put_attachment(doc, infile)
+        db.put_attachment(doc1, infile)
+    id2 = 'åöä'
+    name2 = 'Åkersjöö'.decode('utf-8') # XXX
+    doc2 = {'_id': id2, 'name': name2, 'contents': 'ũber unter vor'}
+    db.put(doc2)
     f = tempfile.NamedTemporaryFile(delete=False)
     filepath = f.name
     f.close()
@@ -245,10 +250,12 @@ def test_dump():
     counts2 = db.undump(filepath)
     os.unlink(filepath)
     assert counts1 == counts2
-    doc = db[id]
-    assert doc['name'] == name
+    doc1 = db[id1]
+    assert doc1['name'] == name1
     with open(__file__, 'rb') as infile:
         file_content = infile.read()
-    attachment_content = db.get_attachment(doc, __file__).read()
+    attachment_content = db.get_attachment(doc1, __file__).read()
     assert file_content == attachment_content
+    doc2 = db[id2]
+    assert doc2['name'] == name2
     db.destroy()

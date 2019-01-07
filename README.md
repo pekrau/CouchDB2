@@ -1,7 +1,7 @@
 # CouchDB2
 
 Slim Python interface module for CouchDB v2.x.
-Also contains a [command line tool](#command-line-tool)
+Also a [command line tool](#command-line-tool)
 
 ## Installation
 
@@ -53,19 +53,19 @@ Does the named database exist?
 
 ### get
 ```python
-server.get(name, check=True)
+db = server.get(name, check=True)
 ```
 Get the named database.
 
 ### create
 ```python
-server.create(name)
+db = server.create(name)
 ```
 Create the named database.
 
 ### get_config
 ```python
-server.get_config(nodename='_local')
+data = server.get_config(nodename='_local')
 ```
 Get the named node's configuration.
 
@@ -101,13 +101,13 @@ Return an iterator over all documents in the database.
 
 ### \_\_getitem\_\_
 ```python
-db[id]
+doc = db[id]
 ```
 Return the document with the given id.
 
 ### exists
 ```python
-db.exists()
+if db.exists(): ...
 ```
 Does this database exist?
 
@@ -131,13 +131,13 @@ Delete this database and all its contents.
 
 ### get_info
 ```python
-db.get_info()
+data = db.get_info()
 ```
 Return a dictionary with information about the database.
 
 ### get_security
 ```python
-db.get_security()
+data = db.get_security()
 ```
 Return a dictionary with security information for the database.
 
@@ -173,7 +173,7 @@ design documents of the database.
 
 ### get
 ```python
-db.get(id, rev=None, revs_info=False, default=None)
+doc = db.get(id, rev=None, revs_info=False, default=None)
 ```
 Return the document with the given id, or the `default` value if not found.
 
@@ -197,13 +197,13 @@ Delete the document.
 
 ### get_designs
 ```python
-db.get_designs()
+data = db.get_designs()
 ```
 Return the design documents for the database.
 
 ### get_design
 ```python
-db.get_design(designname)
+data = db.get_design(designname)
 ```
 Get the named design document.
 
@@ -236,10 +236,11 @@ More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
 
 ### view
 ```python
-db.view(designname, viewname, key=None, keys=None, startkey=None, endkey=None,
-        skip=None, limit=None, sorted=True, descending=False,
-        group=False, group_level=None, reduce=None,
-        include_docs=False)
+result = db.view(designname, viewname, key=None, keys=None,
+                 startkey=None, endkey=None, skip=None, limit=None,
+                 sorted=True, descending=False,
+                 group=False, group_level=None, reduce=None,
+                 include_docs=False)
 ```
 Return a [ViewResult](#viewresult) object, containing
 [Row](#row) objects in the list attribute `rows`.
@@ -260,8 +261,8 @@ Returns a dictionary with items `id` (design document name; sic!),
 
 ### find
 ```python
-db.find(selector, use_index=None, limit=None, skip=None, sort=None,
-        fields=None, bookmark=None, update=None)
+data = db.find(selector, use_index=None, limit=None, skip=None, sort=None,
+               fields=None, bookmark=None, update=None)
 ```
 Select documents according to the Mango index selector.
 
@@ -270,13 +271,13 @@ and `bookmark`.
 
 ### get_attachment
 ```python
-db.get_attachment(doc, filename)
+fileobj = db.get_attachment(doc, filename)
 ```
 Return a file-like object containing the content of the attachment.
 
 ### put_attachment
 ```python
-db.put_attachment(doc, content, filename=None, content_type=None)
+rev = db.put_attachment(doc, content, filename=None, content_type=None)
 ```
 `content` is a string or a file-like object. Return the new revision
 of the document.
@@ -285,13 +286,13 @@ If no filename, then an attempt is made to get it from content object.
 
 ### delete_attachment
 ```python
-db.delete_attachment(doc, filename)
+rev 0 db.delete_attachment(doc, filename)
 ```
 Delete the attachment. Return the new revision of the document.
 
 ### dump
 ```python
-db.dump(filepath, callback=None)
+(ndocs, nfiles) = db.dump(filepath, callback=None)
 ```
 Dump the entire database to a tar file.
 
@@ -305,7 +306,7 @@ A tuple `(ndocs, nfiles)` is returned.
 
 ### undump
 ```python
-db.undump(filepath, callback=None)
+(ndocs, nfiles) = db.undump(filepath, callback=None)
 ```
 Load the tar file, which must have been produced by `dump`.
 
