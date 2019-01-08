@@ -5,12 +5,11 @@ Also a [command line tool](#command-line-tool)
 
 ## Installation
 
-This module relies on `requests`: http://docs.python-requests.org/en/master/
+```
+$ pip install couchdb2
+```
 
-Quick-and-dirty installation method, since this module is not yet on PyPi:
-```
-$ pip install [-e] git+https://github.com/pekrau/CouchDB2.git#egg=couchdb2
-```
+This module relies on `requests`: http://docs.python-requests.org/en/master/
 
 ## Server
 ```python
@@ -41,13 +40,13 @@ Return an iterator over all user-defined databases on the server.
 
 ### \_\_getitem\_\_
 ```python
-server[name]
+db = server[name]
 ```
 Get the named database.
 
 ### \_\_contains\_\_
 ```python
-name in server
+if name in server: ...
 ```
 Does the named database exist?
 
@@ -89,7 +88,7 @@ Return the number of documents in the database.
 
 ### \_\_contains\_\_
 ```python
-id in db
+if id in db: ...
 ```
 Does a document with the given id exist in the database?
 
@@ -408,7 +407,7 @@ Get the settings lookup from a JSON format file.
 If `settings` is given, then output an updated copy of it,
 else update the default settings.
 
-## <a name="command-line-tool"></a>Command line tool
+## Command line tool
 
 The module is also a command line tool for interacting with the CouchDB server.
 
