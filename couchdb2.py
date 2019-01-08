@@ -6,7 +6,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.5.5'
+__version__ = '1.5.6'
 
 # Standard packages
 import argparse
@@ -190,22 +190,22 @@ class Database(object):
             return result
 
     def exists(self):
-        "Does this database exist?"
+        "Does the database exist?"
         response = self.server._HEAD(self.name, errors={404: None})
         return response.status_code == 200
 
     def check(self):
-        "Raises NotFoundError if this database does not exist."
+        "Raises NotFoundError if the database does not exist."
         if not self.exists():
             raise NotFoundError("database '{}' does not exist".format(self))
 
     def create(self):
-        "Create this database."
+        "Create the database."
         self.server._PUT(self.name)
         return self
 
     def destroy(self):
-        "Delete this database and all its contents."
+        "Delete the database and all its contents."
         self.server._DELETE(self.name)
 
     def get_info(self):
@@ -341,7 +341,7 @@ class Database(object):
              include_docs=False):
         """Return a ViewResult object, containing the following attributes:
         - `rows`: the list of Row objects.
-        - `offset`: the offset used for this set of rows.
+        - `offset`: the offset used for the set of rows.
         - `total_rows`: the total number of rows selected.
 
         A Row object contains the following attributes:

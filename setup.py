@@ -4,7 +4,7 @@ with open('README.md', 'r') as infile:
     long_description = infile.read()
 
 setuptools.setup(name='CouchDB2',
-      version='1.5.5',
+      version='1.5.6',
       description='Slim Python interface module for CouchDB v2.x. Also a command line tool.',
       long_description=long_description,
       long_description_content_type='text/markdown',

@@ -1,7 +1,7 @@
 # CouchDB2
 
 Slim Python interface module for CouchDB v2.x.
-Also a [command line tool](#command-line-tool)
+Also a [command line tool](#command-line-tool).
 
 ## Installation
 
@@ -54,7 +54,8 @@ Does the named database exist?
 ```python
 db = server.get(name, check=True)
 ```
-Get the named database.
+Get the named database. If `check` is true, then raise NotFoundError
+if the the database does not exist.
 
 ### create
 ```python
@@ -72,7 +73,8 @@ Get the named node's configuration.
 ```python
 db = Database(server, name, check=True)
 ```
-Interface to a named CouchDB database.
+Interface to a named CouchDB database. If `check` is true, then
+raise NotFoundError if the the database does not exist.
 
 ### \_\_str\_\_
 ```python
@@ -108,25 +110,25 @@ Return the document with the given id.
 ```python
 if db.exists(): ...
 ```
-Does this database exist?
+Does the database exist?
 
 ### check
 ```python
 db.check()
 ```
-Raises NotFoundError if this database does not exist.
+Raises NotFoundError if the database does not exist.
 
 ### create
 ```python
 db.create()
 ```
-Create this database.
+Create the database.
 
 ### destroy
 ```python
 db.destroy()
 ```
-Delete this database and all its contents.
+Delete the database and all its contents.
 
 ### get_info
 ```python
@@ -387,7 +389,7 @@ Named tuple object returned as result from `db.view()`.
 ViewResult(rows, offset, total_rows)
 ```
 - `rows`: the list of `Row` objects.
-- `offset`: the offset used for this set of rows.
+- `offset`: the offset used for the set of rows.
 - `total_rows`: the total number of rows selected.
 
 ### rows
