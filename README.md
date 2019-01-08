@@ -408,7 +408,7 @@ Get the settings lookup from a JSON format file.
 If `settings` is given, then output an updated copy of it,
 else update the default settings.
 
-## Command line tool
+## <a name="command-line-tool"></a>Command line tool
 
 The module is also a command line tool for interacting with the CouchDB server.
 
