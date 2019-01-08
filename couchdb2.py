@@ -6,7 +6,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.5.6'
+__version__ = '1.5.7'
 
 # Standard packages
 import argparse
@@ -36,8 +36,9 @@ class Server(object):
                  username=None, password=None, session=True):
         """Connect to the CouchDB server.
 
-        If `session` is true, then an authenticated session is set up.
-        By default, its lifetime is 10 minutes.
+        If `session` is true, then an authenticated session is used
+        transparently. By default, its lifetime is 10 minutes.
+        Otherwise, username/password is sent with each request.
         """
         self.href = href.rstrip('/') + '/'
         self.username = username

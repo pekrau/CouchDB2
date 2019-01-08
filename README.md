@@ -17,8 +17,9 @@ server = Server(href='http://localhost:5984/', username=None, password=None, ses
 ```
 Connect to the CouchDB server.
 
-If `session` is true, then an authenticated session is set up.
-By default, its lifetime is 10 minutes.
+If `session` is true, then an authenticated session is used
+transparently. By default, its lifetime is 10 minutes.
+Otherwise, username/password is sent with each request.
 
 ### \_\_str\_\_
 ```python
@@ -412,15 +413,16 @@ else update the default settings.
 ## Command line tool
 
 The module is also a command line tool for interacting with the CouchDB server.
+If it was installed properly using pip, do:
 
 ```
-$ python couchdb2.py -h
+$ couchdb2 -h
 ```
 
-Settings for the command line tool are updated in order from the following
-sources (if existing):
+Settings for the command line tool are updated from the following sources,
+in the order given and if existing:
 
-1) Defaults are
+1) Default values are
    ```
    {
      "SERVER": "http://localhost:5984",
@@ -429,9 +431,9 @@ sources (if existing):
      "PASSWORD": null
    }
    ```
-2) From JSON file `~/.couchdb2`
-3) From JSON file `settings.json` (in the current working directory).
-4) From the file given by command line option `--settings FILEPATH`.
+2) Read from the JSON file `~/.couchdb2` (in your home directory).
+3) Read from the JSON file `settings.json` (in the current working directory).
+4) Read from the JSON file given by command line option `--settings FILEPATH`.
 
 Available command options:
 
