@@ -19,6 +19,7 @@ Connect to the CouchDB server.
 
 If `session` is true, then an authenticated session is used
 transparently. By default, its lifetime is 10 minutes.
+
 Otherwise, username/password is sent with each request.
 
 ### \_\_str\_\_

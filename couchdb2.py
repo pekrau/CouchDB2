@@ -38,6 +38,7 @@ class Server(object):
 
         If `session` is true, then an authenticated session is used
         transparently. By default, its lifetime is 10 minutes.
+
         Otherwise, username/password is sent with each request.
         """
         self.href = href.rstrip('/') + '/'
