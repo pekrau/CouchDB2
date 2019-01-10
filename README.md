@@ -112,7 +112,7 @@ Configure a node as a single node, as part of a cluster, or finalize a cluster.
 ### get_db_updates
 ```python
 data = server.get_db_updates(feed=None, timeout=None,
-                       heartbeat=None, since=None)
+                             heartbeat=None, since=None)
 ```
 Return a list of all database events in the CouchDB instance.
 
@@ -137,7 +137,7 @@ Get a list of replication jobs.
 ### get_scheduler_docs
 ```python
 data = server.get_scheduler_docs(limit=None, skip=None,
-                           replicator_db=None, docid=None)
+                                 replicator_db=None, docid=None)
 ```
 Get information about replication document(s).
 
@@ -146,6 +146,12 @@ Get information about replication document(s).
 data = server.get_node_stats(nodename='_local')
 ```
 Return statistics for the running server.
+
+### get_node_system
+```python
+data = server.get_node_system(nodename='_local')
+```
+Return various system-level statistics for the running server.
 
 ## Database
 ```python
@@ -295,7 +301,8 @@ Insert or update the design document under the given name.
 If the existing design document is identical, no action is taken and
 False is returned, else the document is updated and True is returned.
 
-If `rebuild` is True, force view indexes to be rebuilt after update.
+If `rebuild` is True, force view indexes to be rebuilt after update. 
+This may take some time.
 
 Example of doc:
 ```
@@ -358,16 +365,18 @@ Return a file-like object containing the content of the attachment.
 ```python
 rev = db.put_attachment(doc, content, filename=None, content_type=None)
 ```
-`content` is a string or a file-like object. Return the new revision
-of the document.
+`content` is a string or a file-like object.
+Return the new revision of the document.
+The revision in the input `doc` is **not** changed.
 
 If no filename, then an attempt is made to get it from content object.
 
 ### delete_attachment
 ```python
-rev 0 db.delete_attachment(doc, filename)
+rev = db.delete_attachment(doc, filename)
 ```
 Delete the attachment. Return the new revision of the document.
+The revision in the input `doc` is **not** changed.
 
 ### dump
 ```python
