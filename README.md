@@ -24,6 +24,18 @@ transparently. By default, its lifetime is 10 minutes.
 
 Otherwise, username/password is sent with each request.
 
+### version
+```python
+server.version
+```
+Property attribute providing the version of the CouchDB server software.
+
+### user_context
+```python
+server.user_context
+```
+Property attribute providing the user context of the connection.
+
 ### \_\_str\_\_
 ```python
 str(server)
@@ -53,6 +65,12 @@ Get the named database.
 if name in server: ...
 ```
 Does the named database exist?
+
+### up
+```python
+if server.up(): ...
+```
+Is the server up and running, ready to respond to requests?
 
 ### get
 ```python
@@ -87,7 +105,7 @@ Return the status of the node or cluster.
 
 ### set_cluster_setup
 ```python
-server.cluster_setup()
+server.cluster_setup(doc)
 ```
 Configure a node as a single node, as part of a cluster, or finalize a cluster.
 
@@ -103,6 +121,25 @@ Return a list of all database events in the CouchDB instance.
 data = server.get_membership()
 ```
 Return data about the nodes that are part of the cluster.
+
+### set_replicate
+```python
+data = server.set_replicate(doc)
+```
+Request, configure, or stop, a replication operation.
+
+### get_scheduler_jobs
+```python
+data = server.get_scheduler_jobs(limit=None, skip=None)
+```
+Get a list of replication jobs.
+
+### get_scheduler_docs
+```python
+data = server.get_scheduler_docs(limit=None, skip=None,
+                           replicator_db=None, docid=None)
+```
+Get information about replication document(s).
 
 ## Database
 ```python

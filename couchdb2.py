@@ -8,7 +8,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.6.0'
+__version__ = '1.6.1'
 
 # Standard packages
 import argparse
@@ -44,19 +44,26 @@ class Server(object):
         Otherwise, username/password is sent with each request.
         """
         self.href = href.rstrip('/') + '/'
-        self.username = username
-        self.password = password
         self._session = requests.Session()
         self._session.headers.update({'Accept': JSON_MIME})
-        self.user_context = {}
-        if self.username and self.password:
+        if username and password:
             if session:
                 self._POST('_session', 
                            data={'name': username, 'password': password})
-                self.user_context = self._GET('_session').json()
             else:
-                self._session.auth = (self.username, self.password)
-        self.version = self._GET().json()['version']
+                self._session.auth = (username, password)
+
+    @property
+    def version(self):
+        try:
+            return self._version
+        except AttributeError:
+            self._version = self._GET().json()['version']
+            return self._version
+
+    @property
+    def user_context(self):
+        return self._GET('_session').json()
 
     def __str__(self):
         "Return a simple string representation of the server interface."
@@ -80,6 +87,11 @@ class Server(object):
     def __contains__(self, name):
         "Does the named database exist?"
         response = self._HEAD(name, errors={404: None})
+        return response.status_code == 200
+
+    def up(self):
+        "Is the server up and running, ready to respond to requests?"
+        response = self._session.get(self.href + '_up')
         return response.status_code == 200
 
     def get(self, name, check=True):
@@ -106,10 +118,10 @@ class Server(object):
             params = {'ensure_dbs_exists': ensure_dbs_exists}
         return self._GET('_cluster_setup', params=params).json()
 
-    def set_cluster_setup(self, config):
+    def set_cluster_setup(self, doc):
         """Configure a node as a single node, as part of a cluster,
         or finalize a cluster."""
-        self._POST('_cluster_setup', json=config)
+        self._POST('_cluster_setup', json=doc)
 
     def get_db_updates(self, feed=None, timeout=None,
                        heartbeat=None, since=None):
@@ -128,6 +140,34 @@ class Server(object):
     def get_membership(self):
         "Return data about the nodes that are part of the cluster."
         return self._GET('_membership').json()
+
+    def set_replicate(self, doc):
+        "Request, configure, or stop, a replication operation."
+        return self._POST('_replicate', json=doc)
+
+    def get_scheduler_jobs(self, limit=None, skip=None):
+        "Get a list of replication jobs."
+        params = {}
+        if limit is not None:
+            params['limit'] = jsons(limit)
+        if skip is not None:
+            params['skip'] = jsons(skip)
+        return self._GET('_scheduler/jobs', params=params).json()
+
+    def get_scheduler_docs(self, limit=None, skip=None,
+                           replicator_db=None, docid=None):
+        "Get information about replication document(s)."
+        params = {}
+        if limit is not None:
+            params['limit'] = jsons(limit)
+        if skip is not None:
+            params['skip'] = jsons(skip)
+        args = ['_scheduler/docs']
+        if replicator_db is not None:
+            args.append(replicator_db)
+            if docid is not None:
+                args.append(docid)
+        return self._GET(*args, params=params).json()
 
     def _HEAD(self, *segments, **kwargs):
         "HTTP HEAD request to the CouchDB server."
@@ -433,14 +473,14 @@ class Database(object):
         Returns a dictionary with items `id` (design document identifier; sic!),
         `name` (index name) and `result` (`created` or `exists`).
         """
-        data = {'index': {'fields': fields}}
+        doc = {'index': {'fields': fields}}
         if ddoc is not None:
-            data['ddoc'] = ddoc
+            doc['ddoc'] = ddoc
         if name is not None:
-            data['name'] = name
+            doc['name'] = name
         if selector is not None:
-            data['index']['partial_filter_selector'] = selector
-        response = self.server._POST(self.name, '_index', json=data)
+            doc['index']['partial_filter_selector'] = selector
+        response = self.server._POST(self.name, '_index', json=doc)
         return response.json()
 
     def find(self, selector, limit=None, skip=None, sort=None, fields=None,
@@ -450,22 +490,22 @@ class Database(object):
         Returns a dictionary with items `docs`, `warning`, `execution_stats`
         and `bookmark`.
         """
-        data = {'selector': selector}
+        doc = {'selector': selector}
         if limit is not None:
-            data['limit'] = limit
+            doc['limit'] = limit
         if skip is not None:
-            data['skip'] = skip
+            doc['skip'] = skip
         if sort is not None:
-            data['sort'] = sort
+            doc['sort'] = sort
         if fields is not None:
-            data['fields'] = fields
+            doc['fields'] = fields
         if use_index is not None:
-            data['use_index'] = use_index
+            doc['use_index'] = use_index
         if bookmark is not None:
-            data['bookmark'] = bookmark
+            doc['bookmark'] = bookmark
         if update is not None:
-            data['update'] = update
-        response = self.server._POST(self.name, '_find', json=data)
+            doc['update'] = update
+        response = self.server._POST(self.name, '_find', json=doc)
         return response.json(object_pairs_hook=collections.OrderedDict)
 
     def get_attachment(self, doc, filename):
