@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Slim Python interface module for CouchDB v2.x. Also a command line tool.
+"""CouchDB v2.x Python interface in a single module. Also a command line tool.
+
+Most, but not all, features of this module work with CouchDB version < 2.0.
 
 Relies on requests: http://docs.python-requests.org/en/master/
 """
 
 from __future__ import print_function
 
-__version__ = '1.5.7'
+__version__ = '1.6.0'
 
 # Standard packages
 import argparse
@@ -36,8 +38,8 @@ class Server(object):
                  username=None, password=None, session=True):
         """Connect to the CouchDB server.
 
-        If `session` is true, then an authenticated session is used
-        transparently. By default, its lifetime is 10 minutes.
+        If `session` is true, then an authenticated CouchDB session
+        is used transparently. By default, its lifetime is 10 minutes.
 
         Otherwise, username/password is sent with each request.
         """
@@ -91,6 +93,41 @@ class Server(object):
     def get_config(self, nodename='_local'):
         "Get the named node's configuration."
         return self._GET('_node', nodename, '_config').json()
+
+    def get_active_tasks(self):
+        "Return a list of running tasks."
+        return self._GET('_active_tasks').json()
+
+    def get_cluster_setup(self, ensure_dbs_exists=None):
+        "Return the status of the node or cluster."
+        if ensure_dbs_exists is None:
+            params = {}
+        else:
+            params = {'ensure_dbs_exists': ensure_dbs_exists}
+        return self._GET('_cluster_setup', params=params).json()
+
+    def set_cluster_setup(self, config):
+        """Configure a node as a single node, as part of a cluster,
+        or finalize a cluster."""
+        self._POST('_cluster_setup', json=config)
+
+    def get_db_updates(self, feed=None, timeout=None,
+                       heartbeat=None, since=None):
+        "Return a list of all database events in the CouchDB instance."
+        params = {}
+        if feed is not None:
+            params['feed'] = jsons(feed)
+        if timeout is not None:
+            params['timeout'] = jsons(timeout)
+        if heartbeat is not None:
+            params['heartbeat'] = jsons(heartbeat)
+        if since is not None:
+            params['since'] = jsons(since)
+        return self._GET('_db_updates', params=params).json()
+
+    def get_membership(self):
+        "Return data about the nodes that are part of the cluster."
+        return self._GET('_membership').json()
 
     def _HEAD(self, *segments, **kwargs):
         "HTTP HEAD request to the CouchDB server."

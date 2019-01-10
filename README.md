@@ -1,7 +1,9 @@
 # CouchDB2
 
-Slim Python interface module for CouchDB v2.x.
-Also a [command line tool](#command-line-tool).
+CouchDB v2.x Python interface in a single module.
+Also a command line tool; [see below](#command-line-tool).
+
+Most, but not all, features of this module work with CouchDB version < 2.0.
 
 ## Installation
 
@@ -70,6 +72,37 @@ Create the named database.
 data = server.get_config(nodename='_local')
 ```
 Get the named node's configuration.
+
+### get_active_tasks
+```python
+data = server.get_active_tasks()
+```
+Return a list of running tasks.
+
+### get_cluster_setup
+```python
+data = server.get_cluster_setup(config)
+```
+Return the status of the node or cluster.
+
+### set_cluster_setup
+```python
+server.cluster_setup()
+```
+Configure a node as a single node, as part of a cluster, or finalize a cluster.
+
+### get_db_updates
+```python
+data = server.get_db_updates(feed=None, timeout=None,
+                       heartbeat=None, since=None)
+```
+Return a list of all database events in the CouchDB instance.
+
+### get_membership
+```python
+data = server.get_membership()
+```
+Return data about the nodes that are part of the cluster.
 
 ## Database
 ```python
@@ -252,7 +285,7 @@ Return a [ViewResult](#viewresult) object, containing
 ```python
 db.put_index(fields, ddoc=None, name=None, selector=None)
 ```
-Store a Mango index specification.
+Store a Mango index specification. CouchDB v2.x only.
 
 - `fields` is a list of fields to index.
 - `ddoc` is the design document name. Generated if none given.
@@ -267,7 +300,7 @@ Returns a dictionary with items `id` (design document name; sic!),
 data = db.find(selector, use_index=None, limit=None, skip=None, sort=None,
                fields=None, bookmark=None, update=None)
 ```
-Select documents according to the Mango index selector.
+Select documents according to the Mango index selector. CouchDB v2.x only.
 
 Returns a dictionary with items `docs`, `warning`, `execution_stats`
 and `bookmark`.
