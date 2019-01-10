@@ -35,19 +35,19 @@ class Server(object):
     "A connection to the CouchDB server."
 
     def __init__(self, href='http://localhost:5984/',
-                 username=None, password=None, session=True):
+                 username=None, password=None, use_session=True):
         """Connect to the CouchDB server.
 
-        If `session` is true, then an authenticated CouchDB session
+        If `use_session` is true, then an authenticated CouchDB session
         is used transparently. By default, its lifetime is 10 minutes.
 
-        Otherwise, username/password is sent with each request.
+        Otherwise, username and password is sent with each request.
         """
         self.href = href.rstrip('/') + '/'
         self._session = requests.Session()
         self._session.headers.update({'Accept': JSON_MIME})
         if username and password:
-            if session:
+            if use_session:
                 self._POST('_session', 
                            data={'name': username, 'password': password})
             else:
@@ -63,7 +63,11 @@ class Server(object):
 
     @property
     def user_context(self):
-        return self._GET('_session').json()
+        try:
+            return self._user_context
+        except AttributeError:
+            self._user_context = self._GET('_session').json()
+            return self._user_context
 
     def __str__(self):
         "Return a simple string representation of the server interface."
@@ -168,6 +172,14 @@ class Server(object):
             if docid is not None:
                 args.append(docid)
         return self._GET(*args, params=params).json()
+
+    def get_node_stats(self, nodename='_local'):
+        "Return statistics for the running server."
+        return self._GET('_node', nodename, '_stats').json()
+
+    def get_node_system(self, nodename='_local'):
+        "Return various system-level statistics for the running server."
+        return self._GET('_node', nodename, '_system').json()
 
     def _HEAD(self, *segments, **kwargs):
         "HTTP HEAD request to the CouchDB server."

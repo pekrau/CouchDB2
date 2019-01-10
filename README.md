@@ -15,14 +15,14 @@ This module relies on `requests`: http://docs.python-requests.org/en/master/
 
 ## Server
 ```python
-server = Server(href='http://localhost:5984/', username=None, password=None, session=True)
+server = Server(href='http://localhost:5984/', username=None, password=None, use_session=True)
 ```
 Connect to the CouchDB server.
 
-If `session` is true, then an authenticated session is used
+If `use_session` is true, then an authenticated session is used
 transparently. By default, its lifetime is 10 minutes.
 
-Otherwise, username/password is sent with each request.
+Otherwise, username and password is sent with each request.
 
 ### version
 ```python
@@ -140,6 +140,12 @@ data = server.get_scheduler_docs(limit=None, skip=None,
                            replicator_db=None, docid=None)
 ```
 Get information about replication document(s).
+
+### get_node_stats
+```python
+data = server.get_node_stats(nodename='_local')
+```
+Return statistics for the running server.
 
 ## Database
 ```python
