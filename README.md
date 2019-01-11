@@ -66,6 +66,12 @@ if name in server: ...
 ```
 Does the named database exist?
 
+### \_\_call\_\_
+```python
+data = server()
+```
+Return meta information about the server.
+
 ### up
 ```python
 if server.up(): ...

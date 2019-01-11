@@ -1,6 +1,0 @@
-{
-  "SERVER": "http://localhost:5984",
-  "DATABASE": "test",
-  "USERNAME": "admin",
-  "PASSWORD": "abc123"
-}

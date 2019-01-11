@@ -8,7 +8,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.6.3'
+__version__ = '1.6.4'
 
 # Standard packages
 import argparse
@@ -93,6 +93,10 @@ class Server(object):
         response = self._HEAD(name, errors={404: None})
         return response.status_code == 200
 
+    def __call__(self):
+        "Return meta information about the instance."
+        return self._GET().json()
+
     def up(self):
         """Is the server up and running, ready to respond to requests?
 
@@ -111,7 +115,11 @@ class Server(object):
         return Database(self, name, check=False).create()
 
     def get_config(self, nodename='_local'):
-        "Get the named node's configuration."
+        """Get the named node's configuration.
+
+        CouchDB version >= 2.0.
+        """
+        assert self.version >= '2.0'
         return jsonod(self._GET('_node', nodename, '_config'))
 
     def get_active_tasks(self):

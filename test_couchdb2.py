@@ -27,12 +27,16 @@ def setup_module(module):
 
 def test_server():
     global server
+    data = server()
+    assert 'version' in data
+    assert 'vendor' in data
     assert server.version
     if server.version >= '2.0':
         assert server.up()
     # Cannot connect to nonsense address
     with pytest.raises(IOError):
         couchdb2.Server('http://localhost:123456/').up()
+    # data = server.get_config()
 
 def test_database():
     # Keep track of how many databases to start with
