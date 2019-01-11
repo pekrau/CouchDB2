@@ -8,7 +8,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.6.2'
+__version__ = '1.6.3'
 
 # Standard packages
 import argparse
@@ -39,7 +39,7 @@ class Server(object):
         """Connect to the CouchDB server.
 
         If `use_session` is true, then an authenticated CouchDB session
-        is used transparently. By default, its lifetime is 10 minutes.
+        is used transparently.
 
         Otherwise, username and password is sent with each request.
         """
@@ -66,7 +66,7 @@ class Server(object):
         try:
             return self._user_context
         except AttributeError:
-            self._user_context = self._GET('_session').json()
+            self._user_context = jsonod(self._GET('_session'))
             return self._user_context
 
     def __str__(self):
@@ -94,7 +94,11 @@ class Server(object):
         return response.status_code == 200
 
     def up(self):
-        "Is the server up and running, ready to respond to requests?"
+        """Is the server up and running, ready to respond to requests?
+
+        CouchDB version >= 2.0.
+        """
+        assert self.version >= '2.0'
         response = self._session.get(self.href + '_up')
         return response.status_code == 200
 
@@ -108,23 +112,31 @@ class Server(object):
 
     def get_config(self, nodename='_local'):
         "Get the named node's configuration."
-        return self._GET('_node', nodename, '_config').json()
+        return jsonod(self._GET('_node', nodename, '_config'))
 
     def get_active_tasks(self):
         "Return a list of running tasks."
-        return self._GET('_active_tasks').json()
+        return jsonod(self._GET('_active_tasks'))
 
     def get_cluster_setup(self, ensure_dbs_exists=None):
-        "Return the status of the node or cluster."
+        """Return the status of the node or cluster.
+
+        CouchDB version >= 2.0.
+        """
+        assert self.version >= '2.0'
         if ensure_dbs_exists is None:
             params = {}
         else:
             params = {'ensure_dbs_exists': ensure_dbs_exists}
-        return self._GET('_cluster_setup', params=params).json()
+        return jsonod(self._GET('_cluster_setup', params=params))
 
     def set_cluster_setup(self, doc):
         """Configure a node as a single node, as part of a cluster,
-        or finalize a cluster."""
+        or finalize a cluster.
+
+        CouchDB version >= 2.0.
+        """
+        assert self.version >= '2.0'
         self._POST('_cluster_setup', json=doc)
 
     def get_db_updates(self, feed=None, timeout=None,
@@ -139,11 +151,15 @@ class Server(object):
             params['heartbeat'] = jsons(heartbeat)
         if since is not None:
             params['since'] = jsons(since)
-        return self._GET('_db_updates', params=params).json()
+        return jsonod(self._GET('_db_updates', params=params))
 
     def get_membership(self):
-        "Return data about the nodes that are part of the cluster."
-        return self._GET('_membership').json()
+        """Return data about the nodes that are part of the cluster.
+
+        CouchDB version >= 2.0.
+        """
+        assert self.version >= '2.0'
+        return jsonod(self._GET('_membership'))
 
     def set_replicate(self, doc):
         "Request, configure, or stop, a replication operation."
@@ -156,7 +172,7 @@ class Server(object):
             params['limit'] = jsons(limit)
         if skip is not None:
             params['skip'] = jsons(skip)
-        return self._GET('_scheduler/jobs', params=params).json()
+        return jsonod(self._GET('_scheduler/jobs', params=params))
 
     def get_scheduler_docs(self, limit=None, skip=None,
                            replicator_db=None, docid=None):
@@ -171,15 +187,15 @@ class Server(object):
             args.append(replicator_db)
             if docid is not None:
                 args.append(docid)
-        return self._GET(*args, params=params).json()
+        return jsonod(self._GET(*args, params=params))
 
     def get_node_stats(self, nodename='_local'):
         "Return statistics for the running server."
-        return self._GET('_node', nodename, '_stats').json()
+        return jsonod(self._GET('_node', nodename, '_stats'))
 
     def get_node_system(self, nodename='_local'):
         "Return various system-level statistics for the running server."
-        return self._GET('_node', nodename, '_system').json()
+        return jsonod(self._GET('_node', nodename, '_system'))
 
     def _HEAD(self, *segments, **kwargs):
         "HTTP HEAD request to the CouchDB server."
@@ -301,11 +317,11 @@ class Database(object):
 
     def get_info(self):
         "Return a dictionary with information about the database."
-        return self.server._GET(self.name).json()
+        return jsonod(self.server._GET(self.name))
 
     def get_security(self):
         "Return a dictionary with security information for the database."
-        return self.server._GET(self.name, '_security').json()
+        return jsonod(self.server._GET(self.name, '_security'))
 
     def set_security(self, doc):
         "Set the security information for the database."
@@ -354,7 +370,7 @@ class Database(object):
                                     errors={404: None}, params=params)
         if response.status_code == 404:
             return default
-        return response.json(object_pairs_hook=collections.OrderedDict)
+        return jsonod(response)
 
     def put(self, doc):
         """Insert or update the document.
@@ -380,12 +396,16 @@ class Database(object):
                                        headers={'If-Match': doc['_rev']})
 
     def get_designs(self):
-        "Return the design documents for the database."
-        return self.server._GET(self.name, '_design_docs').json()
+        """Return the design documents for the database.
+
+        CouchDB version >= 2.2.
+        """
+        assert self.version >= '2.2'
+        return jsonod(self.server._GET(self.name, '_design_docs'))
 
     def get_design(self, designname):
         "Get the named design document."
-        return self.server._GET(self.name, '_design', designname).json()
+        return jsonod(self.server._GET(self.name, '_design', designname))
 
     def put_design(self, designname, doc, rebuild=True):
         """Insert or update the design document under the given name.
@@ -469,10 +489,19 @@ class Database(object):
         response = self.server._GET(self.name, '_design', designname, '_view',
                                     viewname, params=params)
         data = response.json()
-        return ViewResult([Row(r.get('id'), r.get('key'), r.get('value'),
-                               r.get('doc')) for r in data.get('rows', [])],
+        return ViewResult([Row(r.get('id'), r.get('key'),
+                               r.get('value'), r.get('doc')) 
+                           for r in data.get('rows', [])],
                           data.get('offset'),
                           data.get('total_rows'))
+
+    def get_indexes(self):
+        """Return a list of all indexes in the database.
+
+        CouchDB version >= 2.0.
+        """
+        assert self.version >= '2.0'
+        return jsonod(self.server._GET(self.name, '_index'))
 
     def put_index(self, fields, ddoc=None, name=None, selector=None):
         """Store a Mango index specification.
@@ -484,7 +513,10 @@ class Database(object):
 
         Returns a dictionary with items `id` (design document identifier; sic!),
         `name` (index name) and `result` (`created` or `exists`).
+
+        CouchDB version >= 2.0.
         """
+        assert self.version >= '2.0'
         doc = {'index': {'fields': fields}}
         if ddoc is not None:
             doc['ddoc'] = ddoc
@@ -492,8 +524,15 @@ class Database(object):
             doc['name'] = name
         if selector is not None:
             doc['index']['partial_filter_selector'] = selector
-        response = self.server._POST(self.name, '_index', json=doc)
-        return response.json()
+        return jsonod(self.server._POST(self.name, '_index', json=doc))
+
+    def delete_index(ddoc, name):
+        """Delete the named index.
+
+        CouchDB version >= 2.0.
+        """
+        assert self.version >= '2.0'
+        self.server._DELETE(self.name, '_index', ddoc, 'json', name)
 
     def find(self, selector, limit=None, skip=None, sort=None, fields=None,
              use_index=None, bookmark=None, update=None):
@@ -501,7 +540,10 @@ class Database(object):
 
         Returns a dictionary with items `docs`, `warning`, `execution_stats`
         and `bookmark`.
+
+        CouchDB version >= 2.0.
         """
+        assert self.version >= '2.0'
         doc = {'selector': selector}
         if limit is not None:
             doc['limit'] = limit
@@ -517,8 +559,31 @@ class Database(object):
             doc['bookmark'] = bookmark
         if update is not None:
             doc['update'] = update
-        response = self.server._POST(self.name, '_find', json=doc)
-        return response.json(object_pairs_hook=collections.OrderedDict)
+        return jsonod(self.server._POST(self.name, '_find', json=doc))
+
+    def explain(self, selector, limit=None, skip=None, sort=None, fields=None,
+             use_index=None, bookmark=None, update=None):
+        """Return info on which index is being used by the query.
+
+        CouchDB version >= 2.0.
+        """
+        assert self.version >= '2.0'
+        doc = {'selector': selector}
+        if limit is not None:
+            doc['limit'] = limit
+        if skip is not None:
+            doc['skip'] = skip
+        if sort is not None:
+            doc['sort'] = sort
+        if fields is not None:
+            doc['fields'] = fields
+        if use_index is not None:
+            doc['use_index'] = use_index
+        if bookmark is not None:
+            doc['bookmark'] = bookmark
+        if update is not None:
+            doc['update'] = update
+        return jsonod(self.server._POST(self.name, '_explain', json=doc))
 
     def get_attachment(self, doc, filename):
         "Return a file-like object containing the content of the attachment."
@@ -709,6 +774,9 @@ def jsons(data, indent=None):
     "Convert data into JSON string."
     return json.dumps(data, ensure_ascii=False, indent=indent)
 
+def jsonod(response):
+    "Return JSON using ordered dictionary."
+    return response.json(object_pairs_hook=collections.OrderedDict)
 
 def get_parser():
     "Get the parser for the command line tool."

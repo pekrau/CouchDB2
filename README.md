@@ -20,7 +20,7 @@ server = Server(href='http://localhost:5984/', username=None, password=None, use
 Connect to the CouchDB server.
 
 If `use_session` is true, then an authenticated session is used
-transparently. By default, its lifetime is 10 minutes.
+transparently.
 
 Otherwise, username and password is sent with each request.
 
@@ -72,6 +72,8 @@ if server.up(): ...
 ```
 Is the server up and running, ready to respond to requests?
 
+CouchDB version >= 2.0.
+
 ### get
 ```python
 db = server.get(name, check=True)
@@ -103,11 +105,15 @@ data = server.get_cluster_setup(config)
 ```
 Return the status of the node or cluster.
 
+CouchDB version >= 2.0.
+
 ### set_cluster_setup
 ```python
 server.cluster_setup(doc)
 ```
 Configure a node as a single node, as part of a cluster, or finalize a cluster.
+
+CouchDB version >= 2.0.
 
 ### get_db_updates
 ```python
@@ -121,6 +127,8 @@ Return a list of all database events in the CouchDB instance.
 data = server.get_membership()
 ```
 Return data about the nodes that are part of the cluster.
+
+CouchDB version >= 2.0.
 
 ### set_replicate
 ```python
@@ -286,6 +294,8 @@ data = db.get_designs()
 ```
 Return the design documents for the database.
 
+CouchDB version >= 2.2.
+
 ### get_design
 ```python
 data = db.get_design(designname)
@@ -331,6 +341,14 @@ result = db.view(designname, viewname, key=None, keys=None,
 Return a [ViewResult](#viewresult) object, containing
 [Row](#row) objects in the list attribute `rows`.
 
+### get_indexes
+```python
+data = db.get_indexes()
+```
+Return a list of all indexes in the database.
+
+CouchDB version >= 2.0.
+
 ### put_index
 ```python
 db.put_index(fields, ddoc=None, name=None, selector=None)
@@ -345,15 +363,28 @@ Store a Mango index specification. CouchDB v2.x only.
 Returns a dictionary with items `id` (design document name; sic!),
 `name` (index name) and `result` (`created` or `exists`).
 
+CouchDB version >= 2.0.
+
 ### find
 ```python
 data = db.find(selector, use_index=None, limit=None, skip=None, sort=None,
                fields=None, bookmark=None, update=None)
 ```
-Select documents according to the Mango index selector. CouchDB v2.x only.
+Select documents according to the Mango index selector.
 
 Returns a dictionary with items `docs`, `warning`, `execution_stats`
 and `bookmark`.
+
+CouchDB version >= 2.0.
+
+### explain
+```python
+data = db.explain(selector, use_index=None, limit=None, skip=None, sort=None,
+                  fields=None, bookmark=None, update=None)
+```
+Return info on which index is being used by the query.
+
+CouchDB version >= 2.0.
 
 ### get_attachment
 ```python

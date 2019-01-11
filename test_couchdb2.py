@@ -27,8 +27,9 @@ def setup_module(module):
 
 def test_server():
     global server
-    assert server.up()
     assert server.version
+    if server.version >= '2.0':
+        assert server.up()
     # Cannot connect to nonsense address
     with pytest.raises(IOError):
         couchdb2.Server('http://localhost:123456/').up()
@@ -174,8 +175,8 @@ def test_iterator():
     db.destroy()
 
 def test_index():
-    "Mango index; only for CouchDB version 2 and higher."
-    if not server.version.startswith('2'): return
+    "Mango index."
+    if not server.version >= '2.0': return
     db = server.create(DBNAME)
     db.put({'name': 'Per', 'type': 'person', 'content': 'stuff'})
     db.put({'name': 'Anders', 'type': 'person', 'content': 'other stuff'})
