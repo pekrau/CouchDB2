@@ -123,8 +123,7 @@ CouchDB version >= 2.0.
 
 ### get_db_updates
 ```python
-data = server.get_db_updates(feed=None, timeout=None,
-                             heartbeat=None, since=None)
+data = server.get_db_updates(feed=None, timeout=None, since=None)
 ```
 Return a list of all database events in the CouchDB instance.
 
@@ -148,6 +147,8 @@ data = server.get_scheduler_jobs(limit=None, skip=None)
 ```
 Get a list of replication jobs.
 
+CouchDB version >= 2.0.
+
 ### get_scheduler_docs
 ```python
 data = server.get_scheduler_docs(limit=None, skip=None,
@@ -155,17 +156,23 @@ data = server.get_scheduler_docs(limit=None, skip=None,
 ```
 Get information about replication document(s).
 
+CouchDB version >= 2.0.
+
 ### get_node_stats
 ```python
 data = server.get_node_stats(nodename='_local')
 ```
 Return statistics for the running server.
 
+CouchDB version >= 2.0.
+
 ### get_node_system
 ```python
 data = server.get_node_system(nodename='_local')
 ```
 Return various system-level statistics for the running server.
+
+CouchDB version >= 2.0.
 
 ## Database
 ```python

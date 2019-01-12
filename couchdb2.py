@@ -8,7 +8,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.6.4'
+__version__ = '1.6.5'
 
 # Standard packages
 import argparse
@@ -147,19 +147,20 @@ class Server(object):
         assert self.version >= '2.0'
         self._POST('_cluster_setup', json=doc)
 
-    def get_db_updates(self, feed=None, timeout=None,
-                       heartbeat=None, since=None):
+    def get_db_updates(self, feed=None, timeout=None, since=None):
         "Return a list of all database events in the CouchDB instance."
         params = {}
         if feed is not None:
             params['feed'] = jsons(feed)
         if timeout is not None:
             params['timeout'] = jsons(timeout)
-        if heartbeat is not None:
-            params['heartbeat'] = jsons(heartbeat)
         if since is not None:
             params['since'] = jsons(since)
-        return jsonod(self._GET('_db_updates', params=params))
+        response = self._GET('_db_updates', params=params)
+        if response.text == '\n':
+            return None
+        else:
+            return jsonod(response)
 
     def get_membership(self):
         """Return data about the nodes that are part of the cluster.
@@ -174,7 +175,11 @@ class Server(object):
         return self._POST('_replicate', json=doc)
 
     def get_scheduler_jobs(self, limit=None, skip=None):
-        "Get a list of replication jobs."
+        """Get a list of replication jobs.
+
+        CouchDB version >= 2.0.
+        """
+        assert self.version >= '2.0'
         params = {}
         if limit is not None:
             params['limit'] = jsons(limit)
@@ -184,7 +189,11 @@ class Server(object):
 
     def get_scheduler_docs(self, limit=None, skip=None,
                            replicator_db=None, docid=None):
-        "Get information about replication document(s)."
+        """Get information about replication document(s).
+
+        CouchDB version >= 2.0.
+        """
+        assert self.version >= '2.0'
         params = {}
         if limit is not None:
             params['limit'] = jsons(limit)
@@ -198,11 +207,19 @@ class Server(object):
         return jsonod(self._GET(*args, params=params))
 
     def get_node_stats(self, nodename='_local'):
-        "Return statistics for the running server."
+        """"Return statistics for the running server.
+
+        CouchDB version >= 2.0.
+        """
+        assert self.version >= '2.0'
         return jsonod(self._GET('_node', nodename, '_stats'))
 
     def get_node_system(self, nodename='_local'):
-        "Return various system-level statistics for the running server."
+        """Return various system-level statistics for the running server.
+
+        CouchDB version >= 2.0.
+        """
+        assert self.version >= '2.0'
         return jsonod(self._GET('_node', nodename, '_system'))
 
     def _HEAD(self, *segments, **kwargs):

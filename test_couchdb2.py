@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Test the Python interface module to CouchDB v2.x.
-Uses package py.test.
+Uses the third-party package py.test.
 """
 
 from __future__ import print_function
@@ -19,7 +19,7 @@ def setup_module(module):
     "Read the settings file only once."
     global server
     try:
-        settings = couchdb2.read_settings('settings.json')
+        settings = couchdb2.read_settings('test_settings.json')
         server = couchdb2.Server(username=settings['USERNAME'],
                                  password=settings['PASSWORD'])
     except IOError:
@@ -35,8 +35,22 @@ def test_server():
         assert server.up()
     # Cannot connect to nonsense address
     with pytest.raises(IOError):
-        couchdb2.Server('http://localhost:123456/').up()
-    # data = server.get_config()
+        couchdb2.Server('http://localhost:123456/').version
+    if server.version >= '2.0':
+        data = server.get_config()
+        # XXX
+        data = server.get_cluster_setup()
+        # XXX
+        data = server.get_membership()
+        # XXX
+        data = server.get_scheduler_jobs()
+        # XXX
+        data = server.get_node_stats()
+        # XXX
+        data = server.get_node_system()
+        # XXX
+    data = server.get_active_tasks()
+    assert isinstance(data, type([]))
 
 def test_database():
     # Keep track of how many databases to start with
