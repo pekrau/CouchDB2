@@ -8,7 +8,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.6.9'
+__version__ = '1.6.10'
 
 # Standard packages
 import argparse

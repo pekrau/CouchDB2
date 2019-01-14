@@ -17,12 +17,10 @@ This module relies on `requests`: http://docs.python-requests.org/en/master/
 ```python
 server = Server(href='http://localhost:5984/', username=None, password=None, use_session=True)
 ```
-Connect to the CouchDB server.
+Connection to the CouchDB server.
 
 If `use_session` is true, then an authenticated session is used
-transparently.
-
-Otherwise, username and password is sent with each request.
+transparently. Otherwise, username and password is sent with each request.
 
 ### version
 ```python
@@ -172,8 +170,9 @@ CouchDB version >= 2.0.
 ```python
 db = Database(server, name, check=True)
 ```
-Interface to a named CouchDB database. If `check` is true, then
-raise NotFoundError if the the database does not exist.
+Interface to a named CouchDB database.
+
+If `check` is true, then raise NotFoundError if the the database does not exist.
 
 ### \_\_str\_\_
 ```python
@@ -258,7 +257,7 @@ If `finish` is True, then return only when compaction is done.
 In addition, if defined, the function `callback(seconds)` is called
 every second until compaction is done.
 
-### compact
+### compact_design
 ```python
 db.compact_design(designname)
 ```
@@ -284,10 +283,10 @@ db.put(doc)
 Insert or update the document.
 
 If the document is already in the database, the `_rev` item must
-be present in the document, and it will be updated.
+be present in the document; its value will be updated.
 
-If the document does not contain an item `_id`, it is added
-having a UUID4 value. The `_rev` item is also added.
+If the document does not contain an item `_id`, one will be added
+having a UUID4 value. The `_rev` item will also be added.
 
 ### delete
 ```python
