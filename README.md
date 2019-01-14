@@ -121,12 +121,6 @@ Configure a node as a single node, as part of a cluster, or finalize a cluster.
 
 CouchDB version >= 2.0.
 
-### get_db_updates
-```python
-data = server.get_db_updates(feed=None, timeout=None, since=None)
-```
-Return a list of all database events in the CouchDB instance.
-
 ### get_membership
 ```python
 data = server.get_membership()
