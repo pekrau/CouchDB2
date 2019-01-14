@@ -8,7 +8,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.6.8'
+__version__ = '1.6.9'
 
 # Standard packages
 import argparse
@@ -790,7 +790,10 @@ def jsonod(response):
 
 def get_parser():
     "Get the parser for the command line tool."
-    p = argparse.ArgumentParser(description='CouchDB2 command line tool')
+    p = argparse.ArgumentParser(prog='couchdb2',
+                                usage='%(prog)s [options]',
+                                description='CouchDB v2.x command line tool,'
+                                ' leveraging Python module CouchDB2.')
     p.add_argument('--settings', metavar='FILEPATH',
                    help='settings file in JSON format')
     p.add_argument('-S', '--server',

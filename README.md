@@ -537,11 +537,7 @@ else update the default settings.
 ## Command line tool
 
 The module is also a command line tool for interacting with the CouchDB server.
-If it was installed properly using pip, do:
-
-```
-$ couchdb2 -h
-```
+Installing it using `pip` will set up the command `couchdb2`.
 
 Settings for the command line tool are updated from the following sources,
 in the order given and if existing:
@@ -559,29 +555,19 @@ in the order given and if existing:
 3) Read from the JSON file `settings.json` (in the current working directory).
 4) Read from the JSON file given by command line option `--settings FILEPATH`.
 
-Available command options:
+### Options
+
+To print available command options:
 
 ```
-usage: couchdb2.py [-h] [--settings SETTINGS] [-S SERVER] [-d DATABASE]
-                   [-u USERNAME] [-p PASSWORD] [-q] [-o FILEPATH]
-                   [--indent INT] [-y] [-v | -s] [-V] [--list]
-                   [--create | --destroy] [--compact] [--compact_design DDOC]
-                   [--view_cleanup] [--info]
-                   [--security | --set_security FILEPATH]
-                   [--list_designs | --design DDOC | --put_design DDOC FILEPATH | --delete_design DDOC]
-                   [--dump FILEPATH | --undump FILEPATH]
-                   [-G DOCID | -P FILEPATH | --delete DOCID]
-                   [--attach DOCID FILEPATH | --detach DOCID FILENAME | --get_attach DOCID FILENAME]
-                   [--view SPEC] [--key KEY | --startkey KEY] [--endkey KEY]
-                   [--startkey_docid DOCID] [--endkey_docid DOCID] [--group]
-                   [--group_level INT] [--noreduce] [--limit INT] [--skip INT]
-                   [--descending] [--include_docs]
+$ couchdb2 -h
+usage: couchdb2 [options]
 
-CouchDB2 command line tool
+CouchDB v2.x command line tool, leveraging Python module CouchDB2.
 
 optional arguments:
   -h, --help            show this help message and exit
-  --settings SETTINGS   settings file in JSON format
+  --settings FILEPATH   settings file in JSON format
   -S SERVER, --server SERVER
                         CouchDB server URL, including port number
   -d DATABASE, --database DATABASE
