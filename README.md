@@ -13,6 +13,36 @@ $ pip install couchdb2
 
 This module relies on `requests`: http://docs.python-requests.org/en/master/
 
+## Example code
+
+```python
+import couchdb2
+
+server = couchdb2.Server()   # Arguments required according to local setup
+db = server.create('test')
+
+doc1 = {'_id': 'myid', 'name': 'mydoc', 'level': 4}
+db.put(doc1)
+doc = db['myid']
+assert doc == doc1
+
+doc2 = {'name': 'another', 'level': 0}
+db.put(doc2)
+print(doc2)
+# {'_id': '66b5...', '_rev': '1-f3ac...', 'name': 'another', 'level': 0}
+
+db.put_design('mydesign', 
+              {"views":
+               {"name": {"map": "function (doc) {emit(doc.name, null);}"}
+               }
+              })
+result = db.view('mydesign', 'name', key='another', include_docs=True)
+assert len(result) == 1
+print(result[0].doc)         # Same printout as above
+
+db.destroy()
+```
+
 ## Server
 ```python
 server = Server(href='http://localhost:5984/', username=None, password=None, use_session=True)
@@ -345,7 +375,7 @@ result = db.view(designname, viewname, key=None, keys=None,
                  include_docs=False)
 ```
 Return a [ViewResult](#viewresult) object, containing
-[Row](#row) objects in the list attribute `rows`.
+[Row](#row) objects in the attribute `rows` (a list).
 
 ### get_indexes
 ```python
@@ -483,6 +513,45 @@ Bad `Content-Type` value in the request.
 ServerError()
 ```
 Internal server error.
+## ViewResult
+
+Object returned as result from `db.view()`.
+
+```python
+ViewResult(rows, offset, total_rows)
+```
+Attributes:
+
+- `rows`: the list of `Row` objects.
+- `offset`: the offset used for the set of rows.
+- `total_rows`: the total number of rows selected.
+
+### \_\_len\_\_
+```python
+len(viewresult)
+```
+Return the number of rows in the view result.
+
+### \_\_iter\_\_
+```python
+for row in viewresult: ...
+```
+Return an iterator over all rows in the view result.
+
+### \_\_getitem\_\_
+```python
+row = viewresult[i]
+```
+Return the indexed view result row.
+
+## read_settings
+```python
+read_settings(filepath, settings=None)
+```
+Read the settings lookup from a JSON format file.
+If `settings` is given, then return an updated copy of it,
+else copy the default settings, update, and return.
+
 ## Row
 
 Named tuple object returned in ViewResult list attribute `rows`.
@@ -504,34 +573,6 @@ Alias for field number 1
 Alias for field number 2
 ### doc
 Alias for field number 3
-
-## ViewResult
-
-Named tuple object returned as result from `db.view()`.
-
-```python
-ViewResult(rows, offset, total_rows)
-```
-- `rows`: the list of `Row` objects.
-- `offset`: the offset used for the set of rows.
-- `total_rows`: the total number of rows selected.
-
-### rows
-Contains the rows found: list of `Row` objects.
-
-Alias for field number 0
-### offset
-Alias for field number 1
-### total_rows
-Alias for field number 2
-
-## get_settings
-```python
-get_settings(filepath, settings=None)
-```
-Get the settings lookup from a JSON format file.
-If `settings` is given, then output an updated copy of it,
-else update the default settings.
 
 ## Command line tool
 

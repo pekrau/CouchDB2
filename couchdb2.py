@@ -8,7 +8,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.6.10'
+__version__ = '1.7.0'
 
 # Standard packages
 import argparse
@@ -738,8 +738,24 @@ class _DatabaseIterator(object):
             return self.chunk.pop()
 
 
-ViewResult = collections.namedtuple('ViewResult',
-                                    ['rows', 'offset', 'total_rows'])
+class ViewResult(object):
+    "Result of view query; contains rows, offset, total_rows."
+
+    def __init__(self, rows, offset, total_rows):
+        self.rows = rows
+        self.offset = offset
+        self.total_rows = total_rows
+
+    def __len__(self):
+        return len(self.rows)
+
+    def __getitem__(self, i):
+        return self.rows[i]
+
+    def __iter__(self):
+        return iter(self.rows)
+
+
 Row = collections.namedtuple('Row', ['id', 'key', 'value', 'doc'])
 
 class CouchDB2Exception(Exception):
@@ -956,8 +972,8 @@ DEFAULT_SETTINGS_FILEPATHS = ['~/.couchdb2', 'settings.json']
 
 def read_settings(filepath, settings=None):
     """Read the settings lookup from a JSON format file.
-    If `settings` is given, then output an updated copy of it,
-    else copy the default settings and output an update of it.
+    If `settings` is given, then return an updated copy of it,
+    else copy the default settings, update, and return.
     """
     if settings:
         result = settings.copy()
