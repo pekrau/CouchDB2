@@ -8,7 +8,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.6.6'
+__version__ = '1.6.7'
 
 # Standard packages
 import argparse
@@ -146,21 +146,6 @@ class Server(object):
         """
         assert self.version >= '2.0'
         self._POST('_cluster_setup', json=doc)
-
-    def get_db_updates(self, feed=None, timeout=None, since=None):
-        "Return a list of all database events in the CouchDB instance."
-        params = {}
-        if feed is not None:
-            params['feed'] = jsons(feed)
-        if timeout is not None:
-            params['timeout'] = jsons(timeout)
-        if since is not None:
-            params['since'] = jsons(since)
-        response = self._GET('_db_updates', params=params)
-        if response.text == '\n':
-            return None
-        else:
-            return jsonod(response)
 
     def get_membership(self):
         """Return data about the nodes that are part of the cluster.
