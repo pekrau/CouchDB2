@@ -38,17 +38,21 @@ def test_server():
         couchdb2.Server('http://localhost:123456/').version
     if server.version >= '2.0':
         data = server.get_config()
-        # XXX
+        assert 'vendor' in data
+        assert 'log' in data
         data = server.get_cluster_setup()
-        # XXX
+        assert 'state' in data
         data = server.get_membership()
-        # XXX
+        assert 'all_nodes' in data
+        assert 'cluster_nodes' in data
         data = server.get_scheduler_jobs()
-        # XXX
+        assert 'jobs' in data
         data = server.get_node_stats()
-        # XXX
+        assert 'couchdb' in data
+        assert 'httpd' in data['couchdb']
         data = server.get_node_system()
-        # XXX
+        assert 'uptime' in data
+        assert 'memory' in data
     data = server.get_active_tasks()
     assert isinstance(data, type([]))
 

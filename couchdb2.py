@@ -8,7 +8,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.6.5'
+__version__ = '1.6.6'
 
 # Standard packages
 import argparse
@@ -425,7 +425,7 @@ class Database(object):
 
         CouchDB version >= 2.2.
         """
-        assert self.version >= '2.2'
+        assert self.server.version >= '2.2'
         return jsonod(self.server._GET(self.name, '_design_docs'))
 
     def get_design(self, designname):
@@ -525,7 +525,7 @@ class Database(object):
 
         CouchDB version >= 2.0.
         """
-        assert self.version >= '2.0'
+        assert self.server.version >= '2.0'
         return jsonod(self.server._GET(self.name, '_index'))
 
     def put_index(self, fields, ddoc=None, name=None, selector=None):
@@ -541,7 +541,7 @@ class Database(object):
 
         CouchDB version >= 2.0.
         """
-        assert self.version >= '2.0'
+        assert self.server.version >= '2.0'
         doc = {'index': {'fields': fields}}
         if ddoc is not None:
             doc['ddoc'] = ddoc
@@ -556,7 +556,7 @@ class Database(object):
 
         CouchDB version >= 2.0.
         """
-        assert self.version >= '2.0'
+        assert self.server.version >= '2.0'
         self.server._DELETE(self.name, '_index', ddoc, 'json', name)
 
     def find(self, selector, limit=None, skip=None, sort=None, fields=None,
@@ -568,7 +568,7 @@ class Database(object):
 
         CouchDB version >= 2.0.
         """
-        assert self.version >= '2.0'
+        assert self.server.version >= '2.0'
         doc = {'selector': selector}
         if limit is not None:
             doc['limit'] = limit
@@ -592,7 +592,7 @@ class Database(object):
 
         CouchDB version >= 2.0.
         """
-        assert self.version >= '2.0'
+        assert self.server.version >= '2.0'
         doc = {'selector': selector}
         if limit is not None:
             doc['limit'] = limit
