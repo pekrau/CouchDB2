@@ -8,7 +8,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.7.0'
+__version__ = '1.7.1'
 
 # Standard packages
 import argparse
@@ -95,7 +95,7 @@ class Server(object):
 
     def __call__(self):
         "Return meta information about the instance."
-        return self._GET().json()
+        return self._GET().json(object_pairs_hook=collections.OrderedDict)
 
     def up(self):
         """Is the server up and running, ready to respond to requests?
@@ -444,7 +444,7 @@ class Database(object):
         response = self.server._GET(self.name, '_design', designname,
                                     errors={404: None})
         if response.status_code == 200:
-            current_doc = response.json()
+            current_doc = response.json(object_pairs_hook=collections.OrderedDict)
             doc['_id'] = current_doc['_id']
             doc['_rev'] = current_doc['_rev']
             if doc == current_doc: 
@@ -498,7 +498,7 @@ class Database(object):
             params['include_docs'] = jsons(True)
         response = self.server._GET(self.name, '_design', designname, '_view',
                                     viewname, params=params)
-        data = response.json()
+        data = response.json(object_pairs_hook=collections.OrderedDict)
         return ViewResult([Row(r.get('id'), r.get('key'),
                                r.get('value'), r.get('doc')) 
                            for r in data.get('rows', [])],
@@ -728,7 +728,7 @@ class _DatabaseIterator(object):
                                            params={'include_docs': True,
                                                    'skip': self.skip,
                                                    'limit': self.chunk_size})
-            data = response.json()
+            data = response.json(object_pairs_hook=collections.OrderedDict)
             rows = data['rows']
             if len(rows) == 0:
                 raise StopIteration

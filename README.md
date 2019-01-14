@@ -38,7 +38,7 @@ db.put_design('mydesign',
               })
 result = db.view('mydesign', 'name', key='another', include_docs=True)
 assert len(result) == 1
-print(result[0].doc)         # Same printout as above
+print(result[0].doc)         # Same printout as above, using OrderedDict
 
 db.destroy()
 ```
