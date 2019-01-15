@@ -544,17 +544,15 @@ row = viewresult[i]
 ```
 Return the indexed view result row.
 
-## read_settings
+### json
 ```python
-read_settings(filepath, settings=None)
+data = viewresult.json()
 ```
-Read the settings lookup from a JSON format file.
-If `settings` is given, then return an updated copy of it,
-else copy the default settings, update, and return.
+Return view result data in a JSON-like representation.
 
 ## Row
 
-Named tuple object returned in ViewResult list attribute `rows`.
+Named-tuple object returned in ViewResult list attribute `rows`.
 
 ```python
 Row(id, key, value, doc)
@@ -573,6 +571,16 @@ Alias for field number 1
 Alias for field number 2
 ### doc
 Alias for field number 3
+
+## Utility functions
+
+### read_settings
+```python
+read_settings(filepath, settings=None)
+```
+Read the settings lookup from a JSON format file.
+If `settings` is given, then return an updated copy of it,
+else copy the default settings, update, and return.
 
 ## Command line tool
 

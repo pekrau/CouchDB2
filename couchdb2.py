@@ -8,11 +8,12 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.7.1'
+__version__ = '1.7.2'
 
 # Standard packages
 import argparse
 import collections
+from collections import OrderedDict as odict # Required before Python 3.7
 import getpass
 import gzip
 import io
@@ -95,7 +96,7 @@ class Server(object):
 
     def __call__(self):
         "Return meta information about the instance."
-        return self._GET().json(object_pairs_hook=collections.OrderedDict)
+        return self._GET().json(object_pairs_hook=odict)
 
     def up(self):
         """Is the server up and running, ready to respond to requests?
@@ -444,7 +445,7 @@ class Database(object):
         response = self.server._GET(self.name, '_design', designname,
                                     errors={404: None})
         if response.status_code == 200:
-            current_doc = response.json(object_pairs_hook=collections.OrderedDict)
+            current_doc = response.json(object_pairs_hook=odict)
             doc['_id'] = current_doc['_id']
             doc['_rev'] = current_doc['_rev']
             if doc == current_doc: 
@@ -498,9 +499,11 @@ class Database(object):
             params['include_docs'] = jsons(True)
         response = self.server._GET(self.name, '_design', designname, '_view',
                                     viewname, params=params)
-        data = response.json(object_pairs_hook=collections.OrderedDict)
-        return ViewResult([Row(r.get('id'), r.get('key'),
-                               r.get('value'), r.get('doc')) 
+        data = response.json()
+        return ViewResult([Row(r.get('id'),
+                               r.get('key'),
+                               r.get('value'),
+                               r.get('doc')) 
                            for r in data.get('rows', [])],
                           data.get('offset'),
                           data.get('total_rows'))
@@ -694,7 +697,7 @@ class Database(object):
                     nfiles += 1
                 else:
                     doc = json.loads(itemdata.decode('utf-8'),
-                                     object_pairs_hook=collections.OrderedDict)
+                                     object_pairs_hook=odict)
                     doc.pop('_rev', None)
                     atts = doc.pop('_attachments', dict())
                     self.put(doc)
@@ -728,7 +731,7 @@ class _DatabaseIterator(object):
                                            params={'include_docs': True,
                                                    'skip': self.skip,
                                                    'limit': self.chunk_size})
-            data = response.json(object_pairs_hook=collections.OrderedDict)
+            data = response.json(object_pairs_hook=odict)
             rows = data['rows']
             if len(rows) == 0:
                 raise StopIteration
@@ -755,6 +758,13 @@ class ViewResult(object):
     def __iter__(self):
         return iter(self.rows)
 
+    def json(self):
+        "Return data in a JSON-like representation."
+        result = odict()
+        result['total_rows'] = self.total_rows
+        result['offset'] = self.offset
+        result['rows'] = [r._asdict() for r in self]
+        return result
 
 Row = collections.namedtuple('Row', ['id', 'key', 'value', 'doc'])
 
@@ -802,7 +812,7 @@ def jsons(data, indent=None):
 
 def jsonod(response):
     "Return JSON using ordered dictionary."
-    return response.json(object_pairs_hook=collections.OrderedDict)
+    return response.json(object_pairs_hook=odict)
 
 def get_parser():
     "Get the parser for the command line tool."
@@ -951,7 +961,7 @@ def get_settings(pargs):
     if pargs.password:
         settings['PASSWORD'] = pargs.password
     if pargs.verbose:
-        s = collections.OrderedDict()
+        s = odict()
         for key in ['SERVER', 'DATABASE', 'USERNAME']:
             s[key] = settings[key]
         if settings['PASSWORD'] is None:
@@ -1033,7 +1043,7 @@ def json_input(filepath):
     "Read the JSON document file."
     try:
         with open(filepath, 'r') as infile:
-            return json.load(infile, object_pairs_hook=collections.OrderedDict)
+            return json.load(infile, object_pairs_hook=odict)
     except (IOError, ValueError, TypeError) as error:
         sys.exit("Error: {}".format(error))
 
@@ -1123,8 +1133,7 @@ def execute(pargs, settings):
         json_output(pargs, doc, else_print=True)
     elif pargs.put:
         try:                    # Attempt to interpret arg as explicit doc
-            doc = json.loads(pargs.put,
-                             object_pairs_hook=collections.OrderedDict)
+            doc = json.loads(pargs.put, object_pairs_hook=odict)
         except (ValueError, TypeError): # Arg is filepath to doc
             doc = json_input(pargs.put)
         get_database(server, settings).put(doc)
@@ -1178,11 +1187,7 @@ def execute(pargs, settings):
         if pargs.noreduce:
             kwargs['reduce'] = False
         result = get_database(server, settings).view(design, view, **kwargs)
-        data = collections.OrderedDict()
-        data['total_rows'] = result.total_rows
-        data['offset'] = result.offset
-        data['rows'] = rows = [r._asdict() for r in result.rows]
-        json_output(pargs, data, else_print=True)
+        json_output(pargs, result.json(), else_print=True)
 
     if pargs.dump:
         db = get_database(server, settings)
