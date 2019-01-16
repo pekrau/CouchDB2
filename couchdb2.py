@@ -8,7 +8,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.7.2'
+__version__ = '1.7.3'
 
 # Standard packages
 import argparse
@@ -968,7 +968,7 @@ def get_settings(pargs):
             s['PASSWORD'] = None
         else:
             s['PASSWORD'] = '***'
-        verbose(pargs, 'settings:', jsons(s))
+        verbose(pargs, 'settings:', jsons(s, indent=2))
     return settings
 
 DEFAULT_SETTINGS = {
@@ -1062,7 +1062,7 @@ def execute(pargs, settings):
                     username=settings['USERNAME'],
                     password=settings['PASSWORD'])
     if pargs.verbose and server.user_context:
-        print('user context:', server.user_context)
+        print('user context:', jsons(server.user_context, indent=2))
     if pargs.version:
         if not json_output(pargs, server.version):
             print(server.version)
