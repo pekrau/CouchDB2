@@ -401,6 +401,52 @@ class Database(object):
         response = self.server._PUT(self.name, doc['_id'], json=doc)
         doc['_rev'] = response.json()['rev']
 
+    def update(self, documents, **options):
+        """Perform a bulk update or insertion of the given documents using a
+        single HTTP request.
+
+        The return value of this method is a list containing a tuple for every
+        element in the `documents` sequence. Each tuple is of the form
+        ``(success, docid, rev_or_exc)``, where ``success`` is a boolean
+        indicating whether the update succeeded, ``docid`` is the ID of the
+        document, and ``rev_or_exc`` is either the new document revision, or
+        an exception instance (e.g. `ResourceConflict`) if the update failed.
+
+        If an object in the documents list is not a dictionary, this method
+        looks for an ``items()`` method that can be used to convert the object
+        to a dictionary. Effectively this means you can also use this method
+        with `mapping.Document` objects.
+
+        :param documents: a sequence of dictionaries or `Document` objects, or
+                          objects providing a ``items()`` method that can be
+                          used to convert them to a dictionary
+        :return: an iterable over the resulting documents
+        :rtype: ``list``
+
+        :since: version 0.2
+        """
+        docs = []
+        for doc in documents:
+            if isinstance(doc, dict):
+                docs.append(doc)
+            elif hasattr(doc, 'items'):
+                docs.append(dict(doc.items()))
+            else:
+                raise TypeError('expected dict, got %s' % type(doc))
+
+        content = options
+        content.update(docs=docs)
+        data = self.server._POST(self.name + '/_bulk_docs', body=content)
+
+        results = []
+        for idx, result in enumerate(data):
+            doc = documents[idx]
+            if isinstance(doc, dict): # XXX: Is this a good idea??
+                doc.update({'_id': result['id'], '_rev': result['rev']})
+            results.append((True, result['id'], result['rev']))
+
+        return results
+
     def delete(self, doc):
         "Delete the document."
         if '_id' not in doc:
