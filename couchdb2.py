@@ -429,8 +429,7 @@ class Database(object):
 
         # content = options
         # content.update(docs=docs)
-        data = self.server._POST(self.name + '/_bulk_docs', data=json.dumps({"docs": docs}), headers={"Content-Type": "application/json"}, \
-                                 options=options)
+        data = self.server._POST(self.name + '/_bulk_docs', data=json.dumps({"docs": docs}), headers={"Content-Type": "application/json"},options=options)
 
         results = []
         for idx, result in enumerate(data.json()):
@@ -448,6 +447,27 @@ class Database(object):
         if '_rev' not in doc:
             raise RevisionError("missing '_rev' item in the document")
         response = self.server._DELETE(self.name, doc['_id'], headers={'If-Match': doc['_rev']})
+
+    def purge(self, docs):
+        """Perform purging (complete removing) of the given documents.
+
+        Uses a single HTTP request to purge all given documents. Purged
+        documents do not leave any meta-data in the storage and are not
+        replicated.
+        """
+        content = {}
+        for doc in docs:
+            if isinstance(doc, dict):
+                content[doc['_id']] = [doc['_rev']]
+            elif hasattr(doc, 'items'):
+                doc = dict(doc.items())
+                content[doc['_id']] = [doc['_rev']]
+            else:
+                raise TypeError('expected dict, got %s' % type(doc))
+        data = self.server._POST(self.name + '/_purge', data=json.dumps(content), headers={"Content-Type": "application/json"},
+                                 options=options)
+
+        return data.json()
 
     def get_designs(self):
         """Return the design documents for the database.
@@ -823,7 +843,7 @@ class ServerError(CouchDB2Exception):
 
 
 _ERRORS = {200: None, 201: None, 202: None, 304: None, 400: BadRequestError, 401: AuthorizationError, 403: AuthorizationError, 404: NotFoundError,
-    409: RevisionError, 412: CreationError, 415: ContentTypeError, 500: ServerError}
+           409: RevisionError, 412: CreationError, 415: ContentTypeError, 500: ServerError}
 
 
 def jsons(data, indent=None):
@@ -1152,7 +1172,7 @@ def execute(pargs, settings):
             sys.exit('Error: invalid view specification')
         kwargs = {}
         for key in (
-        'key', 'startkey', 'endkey', 'startkey_docid', 'endkey_docid', 'group', 'group_level', 'limit', 'skip', 'descending', 'include_docs'):
+                'key', 'startkey', 'endkey', 'startkey_docid', 'endkey_docid', 'group', 'group_level', 'limit', 'skip', 'descending', 'include_docs'):
             value = getattr(pargs, key)
             if value is not None:
                 kwargs[key] = value
