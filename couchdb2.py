@@ -156,9 +156,13 @@ class Server(object):
         assert self.version >= '2.0'
         return jsonod(self._GET('_membership'))
 
-    def set_replicate(self, doc):
+    def set_replicate(self, doc, is_transient=False):
         "Request, configure, or stop, a replication operation."
-        return self._POST('_replicate', json=doc)
+        if is_transient:
+            end_point = '_replicate'
+        else:
+            end_point = '_replicator'
+        return self._POST(end_point, json=doc)
 
     def get_scheduler_jobs(self, limit=None, skip=None):
         """Get a list of replication jobs.
