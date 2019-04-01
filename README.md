@@ -318,11 +318,46 @@ be present in the document; its value will be updated.
 If the document does not contain an item `_id`, one will be added
 having a UUID4 value. The `_rev` item will also be added.
 
+### update
+```python
+db.update(docs)
+```
+Perform a bulk update or insertion of the given documents using a
+        single HTTP request.
+
+The return value of this method is a list containing a tuple for every
+element in the `docs` sequence. Each tuple is of the form
+``(success, docid, rev_or_exc)``, where ``success`` is a boolean
+indicating whether the update succeeded, ``docid`` is the ID of the
+document, and ``rev_or_exc`` is either the new document revision, or
+an exception instance (e.g. `ResourceConflict`) if the update failed.
+
+If an object in the documents list is not a dictionary, this method
+looks for an ``items()`` method that can be used to convert the object
+to a dictionary. Effectively this means you can also use this method
+with `mapping.Document` objects.
+
+`docs` : a sequence of dictionaries or `Document` objects, or
+                  objects providing a ``items()`` method that can be
+                  used to convert them to a dictionary
+                  
+Return: an iterable over the resulting documents `list`
+
 ### delete
 ```python
 db.delete(doc)
 ```
 Delete the document.
+
+### purge
+```python
+db.purge(docs)
+```
+Perform purging (complete removing) of the given documents.
+
+Uses a single HTTP request to purge all given documents. Purged
+documents do not leave any meta-data in the storage and are not
+replicated.
 
 ### get_designs
 ```python
