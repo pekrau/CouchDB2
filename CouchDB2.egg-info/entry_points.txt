@@ -1,0 +1,3 @@
+[console_scripts]
+couchdb2 = couchdb2:main
+

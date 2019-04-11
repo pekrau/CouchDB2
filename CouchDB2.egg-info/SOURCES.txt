@@ -1,0 +1,9 @@
+README.md
+couchdb2.py
+setup.py
+CouchDB2.egg-info/PKG-INFO
+CouchDB2.egg-info/SOURCES.txt
+CouchDB2.egg-info/dependency_links.txt
+CouchDB2.egg-info/entry_points.txt
+CouchDB2.egg-info/requires.txt
+CouchDB2.egg-info/top_level.txt
