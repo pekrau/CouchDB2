@@ -394,7 +394,7 @@ class Database(object):
         response = self.server._PUT(self.name, doc['_id'], json=doc)
         doc['_rev'] = response.json()['rev']
 
-    def update(self, documents, **options):
+    def update(self, documents):
         """Perform a bulk update or insertion of the given documents using a
         single HTTP request.
 
@@ -429,7 +429,7 @@ class Database(object):
 
         # content = options
         # content.update(docs=docs)
-        data = self.server._POST(self.name + '/_bulk_docs', data=json.dumps({"docs": docs}), headers={"Content-Type": "application/json"},options=options)
+        data = self.server._POST(self.name + '/_bulk_docs', data=json.dumps({"docs": docs}), headers={"Content-Type": "application/json"})
 
         results = []
         for idx, result in enumerate(data.json()):
@@ -464,9 +464,7 @@ class Database(object):
                 content[doc['_id']] = [doc['_rev']]
             else:
                 raise TypeError('expected dict, got %s' % type(doc))
-        data = self.server._POST(self.name + '/_purge', data=json.dumps(content), headers={"Content-Type": "application/json"},
-                                 options=options)
-
+        data = self.server._POST(self.name + '/_purge', data=json.dumps(content), headers={"Content-Type": "application/json"})
         return data.json()
 
     def get_designs(self):
