@@ -8,7 +8,7 @@ Relies on requests: http://docs.python-requests.org/en/master/
 
 from __future__ import print_function
 
-__version__ = '1.7.3'
+__version__ = '1.7.4'
 
 # Standard packages
 import argparse
@@ -390,10 +390,10 @@ class Database(object):
         be present in the document, and it will be updated.
 
         If the document does not contain an item `_id`, it is added
-        having a UUID4 value. The `_rev` item is also added.
+        with a IUID value. The `_rev` item is also added.
         """
         if '_id' not in doc:
-            doc['_id'] = uuid.uuid4().hex
+            doc['_id'] = get_iuid()
         response = self.server._PUT(self.name, doc['_id'], json=doc)
         doc['_rev'] = response.json()['rev']
 
@@ -805,6 +805,10 @@ _ERRORS = {
     412: CreationError,
     415: ContentTypeError,
     500: ServerError}
+
+def get_iuid():
+    "Return a new instance unique identifier."
+    return uuid.uuid4().hex
 
 def jsons(data, indent=None):
     "Convert data into JSON string."
