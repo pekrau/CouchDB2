@@ -433,11 +433,10 @@ class Database(object):
 
         results = []
         for idx, result in enumerate(data.json()):
-            doc = documents[idx]
-            if isinstance(doc, dict):  # XXX: Is this a good idea??
-                doc.update({'_id': result['id'], '_rev': result['rev']})
-            results.append((True, result['id'], result['rev']))
-
+            if "error" in result:
+                results.append((False, result['id'], result['error'], result['reason']))
+            else:
+                results.append((True, result['id'], result['rev']))
         return results
 
     def delete(self, doc):

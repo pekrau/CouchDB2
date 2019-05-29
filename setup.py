@@ -4,13 +4,13 @@ with open('README.md', 'r') as infile:
     long_description = infile.read()
 
 setuptools.setup(name='CouchDB2',
-      version='1.7.2',
+      version='1.7.4',
       description='CouchDB v2.x Python interface in a single module. Also a command line tool.',
       long_description=long_description,
       long_description_content_type='text/markdown',
-      url='https://github.com/pekrau/CouchDB2',
-      author='Per Kraulis',
-      author_email='per.kraulis@scilifelab.se',
+      url='https://github.com/elchaposing/CouchDB2',
+      author='elChapoSing',
+      author_email='',
       license='MIT',
       py_modules=['couchdb2'],
       install_requires=[
