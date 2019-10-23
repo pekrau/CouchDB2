@@ -1,3 +1,6 @@
 test_settings.json
 *~
-*.pyc
+build
+dist
+CouchDB2.egg-info
+__pycache__
