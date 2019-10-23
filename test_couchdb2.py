@@ -1,15 +1,15 @@
-# -*- coding: utf-8 -*-
 """Test the Python interface module to CouchDB v2.x.
 Uses the third-party package py.test.
 """
 
-from __future__ import print_function
-
+# Standard packages
 import os
 import tempfile
 
+# Third-party package
 import pytest
 
+# Module to test
 import couchdb2
 
 server = None

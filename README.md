@@ -1,6 +1,6 @@
 # CouchDB2
 
-CouchDB v2.x Python interface in a single module.
+CouchDB v2.x Python 3 interface in a single module.
 Also a command line tool; [see below](#command-line-tool).
 
 Most, but not all, features of this module work with CouchDB version < 2.0.
@@ -323,25 +323,25 @@ having a UUID4 value. The `_rev` item will also be added.
 db.update(docs)
 ```
 Perform a bulk update or insertion of the given documents using a
-        single HTTP request.
+single HTTP request.
 
 The return value of this method is a list containing a tuple for every
 element in the `docs` sequence. Each tuple is of the form
-``(success, docid, rev_or_exc)``, where ``success`` is a boolean
-indicating whether the update succeeded, ``docid`` is the ID of the
-document, and ``rev_or_exc`` is either the new document revision, or
+`(success, docid, rev_or_exc)`, where `success` is a boolean
+indicating whether the update succeeded, `docid` is the ID of the
+document, and `rev_or_exc` is either the new document revision, or
 an exception instance (e.g. `ResourceConflict`) if the update failed.
 
 If an object in the documents list is not a dictionary, this method
-looks for an ``items()`` method that can be used to convert the object
+looks for an `items()` method that can be used to convert the object
 to a dictionary. Effectively this means you can also use this method
 with `mapping.Document` objects.
 
 `docs` : a sequence of dictionaries or `Document` objects, or
-                  objects providing a ``items()`` method that can be
-                  used to convert them to a dictionary
+objects providing a `items()` method that can be used to convert
+them to a dictionary.
                   
-Return: an iterable over the resulting documents `list`
+Returns an iterable (list) over the resulting documents.
 
 ### delete
 ```python

@@ -1,14 +1,11 @@
-# -*- coding: utf-8 -*-
-"""CouchDB v2.x Python interface in a single module. Also a command line tool.
+"""CouchDB v2.x Python 3 interface in a single module. Also a command line tool.
 
 Most, but not all, features of this module work with CouchDB version < 2.0.
 
 Relies on requests: http://docs.python-requests.org/en/master/
 """
 
-from __future__ import print_function
-
-__version__ = '1.7.4'
+__version__ = '1.8.1'
 
 # Standard packages
 import argparse
@@ -25,17 +22,18 @@ import tarfile
 import time
 import uuid
 
-# Third-party package.
+# Third-party package
 import requests
 
 JSON_MIME = 'application/json'
-BIN_MIME = 'application/octet-stream'
+BIN_MIME  = 'application/octet-stream'
 
 
 class Server(object):
     "A connection to the CouchDB server."
 
-    def __init__(self, href='http://localhost:5984/', username=None, password=None, use_session=True):
+    def __init__(self, href='http://localhost:5984/',
+                 username=None, password=None, use_session=True):
         """Connect to the CouchDB server.
 
         If `use_session` is true, then an authenticated CouchDB session
@@ -48,7 +46,8 @@ class Server(object):
         self._session.headers.update({'Accept': JSON_MIME})
         if username and password:
             if use_session:
-                self._POST('_session', data={'name': username, 'password': password})
+                self._POST('_session',
+                           data={'name': username, 'password': password})
             else:
                 self._session.auth = (username, password)
 
@@ -80,7 +79,8 @@ class Server(object):
     def __iter__(self):
         "Return an iterator over all user-defined databases on the server."
         data = self._GET('_all_dbs').json()
-        return iter([Database(self, n, check=False) for n in data if not n.startswith('_')])
+        return iter([Database(self, n, check=False) 
+                     for n in data if not n.startswith('_')])
 
     def __getitem__(self, name):
         "Get the named database."
@@ -174,7 +174,8 @@ class Server(object):
             params['skip'] = jsons(skip)
         return jsonod(self._GET('_scheduler/jobs', params=params))
 
-    def get_scheduler_docs(self, limit=None, skip=None, replicator_db=None, docid=None):
+    def get_scheduler_docs(self, limit=None, skip=None,
+                           replicator_db=None, docid=None):
         """Get information about replication document(s).
 
         CouchDB version >= 2.0.
@@ -346,7 +347,8 @@ class Database(object):
         In addition, if defined, the function `callback(seconds)` is called
         every second until compaction is done.
         """
-        self.server._POST(self.name, '_compact', headers={'Content-Type': JSON_MIME})
+        self.server._POST(self.name, '_compact',
+                          headers={'Content-Type': JSON_MIME})
         if finish:
             response = self.server._GET(self.name)
             seconds = 0
@@ -358,7 +360,8 @@ class Database(object):
 
     def compact_design(self, designname):
         "Compact the view indexes associated with the named design document."
-        self.server._POST(self.name, '_compact', designname, headers={'Content-Type': JSON_MIME})
+        self.server._POST(self.name, '_compact', designname,
+                          headers={'Content-Type': JSON_MIME})
 
     def view_cleanup(self):
         """Remove unnecessary view index files due to changed views in
@@ -375,7 +378,8 @@ class Database(object):
             params['rev'] = rev
         if revs_info:
             params['revs_info'] = jsons(True)
-        response = self.server._GET(self.name, id, errors={404: None}, params=params)
+        response = self.server._GET(self.name, id, errors={404: None},
+                                    params=params)
         if response.status_code == 404:
             return default
         return jsonod(response)
@@ -394,32 +398,30 @@ class Database(object):
         response = self.server._PUT(self.name, doc['_id'], json=doc)
         doc['_rev'] = response.json()['rev']
 
-    def update(self, documents):
+    def update(self, docs):
         """Perform a bulk update or insertion of the given documents using a
         single HTTP request.
 
         The return value of this method is a list containing a tuple for every
-        element in the `documents` sequence. Each tuple is of the form
-        ``(success, docid, rev_or_exc)``, where ``success`` is a boolean
-        indicating whether the update succeeded, ``docid`` is the ID of the
-        document, and ``rev_or_exc`` is either the new document revision, or
+        element in the `docs` sequence. Each tuple is of the form
+        `(success, docid, rev_or_exc)`, where `success` is a boolean
+        indicating whether the update succeeded, `docid` is the ID of the
+        document, and `rev_or_exc` is either the new document revision, or
         an exception instance (e.g. `ResourceConflict`) if the update failed.
 
-        If an object in the documents list is not a dictionary, this method
-        looks for an ``items()`` method that can be used to convert the object
+        If an object in the docs list is not a dictionary, this method
+        looks for an `items()` method that can be used to convert the object
         to a dictionary. Effectively this means you can also use this method
         with `mapping.Document` objects.
 
-        :param documents: a sequence of dictionaries or `Document` objects, or
-                          objects providing a ``items()`` method that can be
-                          used to convert them to a dictionary
-        :return: an iterable over the resulting documents
-        :rtype: ``list``
+        `docs`: a sequence of dictionaries or `Document` objects, or
+        objects providing a `items()` method that can be used to convert
+        them to a dictionary.
 
-        :since: version 0.2
+        Returns an iterable (list) over the resulting documents.
         """
         docs = []
-        for doc in documents:
+        for doc in docs:
             if isinstance(doc, dict):
                 docs.append(doc)
             elif hasattr(doc, 'items'):
@@ -427,9 +429,9 @@ class Database(object):
             else:
                 raise TypeError('expected dict, got %s' % type(doc))
 
-        # content = options
-        # content.update(docs=docs)
-        data = self.server._POST(self.name + '/_bulk_docs', data=json.dumps({"docs": docs}), headers={"Content-Type": "application/json"})
+        data = self.server._POST(self.name + '/_bulk_docs',
+                                 data=json.dumps({"docs": docs}),
+                                 headers={"Content-Type": "application/json"})
 
         results = []
         for idx, result in enumerate(data.json()):
@@ -445,7 +447,8 @@ class Database(object):
             raise NotFoundError("missing '_id' item in the document")
         if '_rev' not in doc:
             raise RevisionError("missing '_rev' item in the document")
-        response = self.server._DELETE(self.name, doc['_id'], headers={'If-Match': doc['_rev']})
+        response = self.server._DELETE(self.name, doc['_id'],
+                                       headers={'If-Match': doc['_rev']})
 
     def purge(self, docs):
         """Perform purging (complete removing) of the given documents.
@@ -463,7 +466,9 @@ class Database(object):
                 content[doc['_id']] = [doc['_rev']]
             else:
                 raise TypeError('expected dict, got %s' % type(doc))
-        data = self.server._POST(self.name + '/_purge', data=json.dumps(content), headers={"Content-Type": "application/json"})
+        data = self.server._POST(self.name + '/_purge',
+                                 data=json.dumps(content),
+                                 headers={"Content-Type": "application/json"})
         return data.json()
 
     def get_designs(self):
@@ -502,7 +507,8 @@ class Database(object):
 
         More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
         """
-        response = self.server._GET(self.name, '_design', designname, errors={404: None})
+        response = self.server._GET(self.name, '_design', designname,
+                                    errors={404: None})
         if response.status_code == 200:
             current_doc = response.json(object_pairs_hook=odict)
             doc['_id'] = current_doc['_id']
@@ -515,7 +521,9 @@ class Database(object):
                 self.view(designname, view, limit=1)
         return True
 
-    def view(self, designname, viewname, key=None, keys=None, startkey=None, endkey=None, skip=None, limit=None, sorted=True, descending=False,
+    def view(self, designname, viewname,
+             key=None, keys=None, startkey=None, endkey=None,
+             skip=None, limit=None, sorted=True, descending=False,
              group=False, group_level=None, reduce=None, include_docs=False):
         """Return a ViewResult object, containing the following attributes:
         - `rows`: the list of Row objects.
@@ -553,9 +561,12 @@ class Database(object):
             params['reduce'] = jsons(bool(reduce))
         if include_docs:
             params['include_docs'] = jsons(True)
-        response = self.server._GET(self.name, '_design', designname, '_view', viewname, params=params)
+        response = self.server._GET(self.name, '_design', designname,
+                                    '_view', viewname, params=params)
         data = response.json()
-        return ViewResult([Row(r.get('id'), r.get('key'), r.get('value'), r.get('doc')) for r in data.get('rows', [])], data.get('offset'),
+        return ViewResult([Row(r.get('id'), r.get('key'), r.get('value'),
+                               r.get('doc')) for r in data.get('rows', [])],
+                          data.get('offset'),
                           data.get('total_rows'))
 
     def get_indexes(self):
@@ -597,7 +608,8 @@ class Database(object):
         assert self.server.version >= '2.0'
         self.server._DELETE(self.name, '_index', ddoc, 'json', name)
 
-    def find(self, selector, limit=None, skip=None, sort=None, fields=None, use_index=None, bookmark=None, update=None):
+    def find(self, selector, limit=None, skip=None, sort=None, fields=None, 
+             use_index=None, bookmark=None, update=None):
         """Select documents according to the selector.
 
         Returns a dictionary with items `docs`, `warning`, `execution_stats`
@@ -623,7 +635,8 @@ class Database(object):
             doc['update'] = update
         return jsonod(self.server._POST(self.name, '_find', json=doc))
 
-    def explain(self, selector, limit=None, skip=None, sort=None, fields=None, use_index=None, bookmark=None, update=None):
+    def explain(self, selector, limit=None, skip=None, sort=None, fields=None,
+                use_index=None, bookmark=None, update=None):
         """Return info on which index is being used by the query.
 
         CouchDB version >= 2.0.
@@ -648,7 +661,8 @@ class Database(object):
 
     def get_attachment(self, doc, filename):
         "Return a file-like object containing the content of the attachment."
-        response = self.server._GET(self.name, doc['_id'], filename, headers={'If-Match': doc['_rev']})
+        response = self.server._GET(self.name, doc['_id'], filename,
+                                    headers={'If-Match': doc['_rev']})
         return io.BytesIO(response.content)
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
@@ -665,12 +679,16 @@ class Database(object):
         if not content_type:
             (content_type, enc) = mimetypes.guess_type(filename, strict=False)
             if not content_type: content_type = BIN_MIME
-        response = self.server._PUT(self.name, doc['_id'], filename, data=content, headers={'Content-Type': content_type, 'If-Match': doc['_rev']})
+        response = self.server._PUT(self.name, doc['_id'], filename,
+                                    data=content,
+                                    headers={'Content-Type': content_type,
+                                             'If-Match': doc['_rev']})
         return response.json()['rev']
 
     def delete_attachment(self, doc, filename):
         "Delete the attachment. Return the new revision of the document."
-        response = self.server._DELETE(self.name, doc['_id'], filename, headers={'If-Match': doc['_rev']})
+        response = self.server._DELETE(self.name, doc['_id'], filename,
+                                       headers={'If-Match': doc['_rev']})
         return response.json()['rev']
 
     def dump(self, filepath, callback=None):
@@ -699,7 +717,8 @@ class Database(object):
                 ndocs += 1
                 # Attachments must follow their document.
                 for attname in doc.get('_attachments', dict()):
-                    info = tarfile.TarInfo(u"{0}_att/{1}".format(doc['_id'], attname))
+                    info = tarfile.TarInfo(u"{0}_att/{1}".format(doc['_id'], 
+                                                                 attname))
                     attfile = self.get_attachment(doc, attname)
                     if attfile is None:
                         attdata = ''
@@ -738,14 +757,16 @@ class Database(object):
                     self.put_attachment(doc, itemdata, **atts.pop(item.name))
                     nfiles += 1
                 else:
-                    doc = json.loads(itemdata.decode('utf-8'), object_pairs_hook=odict)
+                    doc = json.loads(itemdata.decode('utf-8'),
+                                     object_pairs_hook=odict)
                     doc.pop('_rev', None)
                     atts = doc.pop('_attachments', dict())
                     self.put(doc)
                     ndocs += 1
                     for attname, attinfo in atts.items():
                         key = u"{0}_att/{1}".format(doc['_id'], attname)
-                        atts[key] = dict(filename=attname, content_type=attinfo['content_type'])
+                        atts[key] = dict(filename=attname,
+                                         content_type=attinfo['content_type'])
                 if ndocs % 100 == 0 and callback:
                     callback(ndocs, nfiles)
         return (ndocs, nfiles)
@@ -767,7 +788,10 @@ class _DatabaseIterator(object):
         try:
             return self.chunk.pop()
         except IndexError:
-            response = self.db.server._GET(self.db.name, '_all_docs', params={'include_docs': True, 'skip': self.skip, 'limit': self.chunk_size})
+            response = self.db.server._GET(self.db.name, '_all_docs',
+                                           params={'include_docs': True,
+                                                   'skip': self.skip,
+                                                   'limit': self.chunk_size})
             data = response.json(object_pairs_hook=odict)
             rows = data['rows']
             if len(rows) == 0:
@@ -839,8 +863,18 @@ class ServerError(CouchDB2Exception):
     "Internal server error."
 
 
-_ERRORS = {200: None, 201: None, 202: None, 304: None, 400: BadRequestError, 401: AuthorizationError, 403: AuthorizationError, 404: NotFoundError,
-           409: RevisionError, 412: CreationError, 415: ContentTypeError, 500: ServerError}
+_ERRORS = {200: None,
+           201: None,
+           202: None, 
+           304: None,
+           400: BadRequestError,
+           401: AuthorizationError,
+           403: AuthorizationError,
+           404: NotFoundError,
+           409: RevisionError,
+           412: CreationError,
+           415: ContentTypeError,
+           500: ServerError}
 
 
 def get_iuid():
@@ -859,75 +893,119 @@ def jsonod(response):
 
 def get_parser():
     "Get the parser for the command line tool."
-    p = argparse.ArgumentParser(prog='couchdb2', usage='%(prog)s [options]', description='CouchDB v2.x command line tool,'
-                                                                                         ' leveraging Python module CouchDB2.')
-    p.add_argument('--settings', metavar='FILEPATH', help='settings file in JSON format')
-    p.add_argument('-S', '--server', help='CouchDB server URL, including port number')
+    p = argparse.ArgumentParser(prog='couchdb2', usage='%(prog)s [options]',
+                                description='CouchDB v2.x command line tool,'
+                                ' leveraging Python module CouchDB2.')
+    p.add_argument('--settings', metavar='FILEPATH', 
+                   help='settings file in JSON format')
+    p.add_argument('-S', '--server',
+                   help='CouchDB server URL, including port number')
     p.add_argument('-d', '--database', help='database to operate on')
     p.add_argument('-u', '--username', help='CouchDB user account name')
     x01 = p.add_mutually_exclusive_group()
     x01.add_argument('-p', '--password', help='CouchDB user account password')
-    x01.add_argument('-q', '--password_question', action='store_true', help='ask for the password by interactive input')
-    p.add_argument('-o', '--output', metavar='FILEPATH', help='write output to the given file (JSON format)')
-    p.add_argument('--indent', type=int, metavar='INT', help='indentation level for JSON format output file')
-    p.add_argument('-y', '--yes', action='store_true', help='do not ask for confirmation (delete, destroy)')
+    x01.add_argument('-q', '--password_question', action='store_true',
+                     help='ask for the password by interactive input')
+    p.add_argument('-o', '--output', metavar='FILEPATH',
+                   help='write output to the given file (JSON format)')
+    p.add_argument('--indent', type=int, metavar='INT',
+                   help='indentation level for JSON format output file')
+    p.add_argument('-y', '--yes', action='store_true',
+                   help='do not ask for confirmation (delete, destroy)')
     x02 = p.add_mutually_exclusive_group()
-    x02.add_argument('-v', '--verbose', action='store_true', help='print more information')
-    x02.add_argument('-s', '--silent', action='store_true', help='print no information')
+    x02.add_argument('-v', '--verbose', action='store_true',
+                     help='print more information')
+    x02.add_argument('-s', '--silent', action='store_true', 
+                     help='print no information')
 
     g0 = p.add_argument_group('server operations')
-    g0.add_argument('-V', '--version', action='store_true', help='output CouchDB server version')
-    g0.add_argument('--list', action='store_true', help='output a list of the databases on the server')
+    g0.add_argument('-V', '--version', action='store_true',
+                    help='output CouchDB server version')
+    g0.add_argument('--list', action='store_true',
+                    help='output a list of the databases on the server')
 
     g1 = p.add_argument_group('database operations')
     x11 = g1.add_mutually_exclusive_group()
-    x11.add_argument('--create', action='store_true', help='create the database')
-    x11.add_argument('--destroy', action='store_true', help='delete the database and all its contents')
-    g1.add_argument('--compact', action='store_true', help='compact the database; may take some time')
-    g1.add_argument('--compact_design', metavar='DDOC', help='compact the view indexes for the named design doc')
-    g1.add_argument('--view_cleanup', action='store_true', help='remove view index files no longer required')
-    g1.add_argument('--info', action='store_true', help='output information about the database')
+    x11.add_argument('--create', action='store_true',
+                     help='create the database')
+    x11.add_argument('--destroy', action='store_true', 
+                     help='delete the database and all its contents')
+    g1.add_argument('--compact', action='store_true',
+                    help='compact the database; may take some time')
+    g1.add_argument('--compact_design', metavar='DDOC', 
+                    help='compact the view indexes for the named design doc')
+    g1.add_argument('--view_cleanup', action='store_true', 
+                    help='remove view index files no longer required')
+    g1.add_argument('--info', action='store_true',
+                    help='output information about the database')
     x12 = g1.add_mutually_exclusive_group()
-    x12.add_argument('--security', action='store_true', help='output security information for the database')
-    x12.add_argument('--set_security', metavar='FILEPATH', help='set security information for the database'
-                                                                ' from the JSON file')
+    x12.add_argument('--security', action='store_true',
+                     help='output security information for the database')
+    x12.add_argument('--set_security', metavar='FILEPATH',
+                     help='set security information for the database'
+                     ' from the JSON file')
     x13 = g1.add_mutually_exclusive_group()
-    x13.add_argument('--list_designs', action='store_true', help='list design documents for the database')
-    x13.add_argument('--design', metavar='DDOC', help='output the named design document')
-    x13.add_argument('--put_design', nargs=2, metavar=('DDOC', 'FILEPATH'), help='store the named design document from the file')
-    x13.add_argument('--delete_design', metavar='DDOC', help='delete the named design document')
+    x13.add_argument('--list_designs', action='store_true', 
+                     help='list design documents for the database')
+    x13.add_argument('--design', metavar='DDOC',
+                     help='output the named design document')
+    x13.add_argument('--put_design', nargs=2, metavar=('DDOC', 'FILEPATH'),
+                     help='store the named design document from the file')
+    x13.add_argument('--delete_design', metavar='DDOC',
+                     help='delete the named design document')
     x14 = g1.add_mutually_exclusive_group()
-    x14.add_argument('--dump', metavar='FILEPATH', help='create a dump file of the database')
-    x14.add_argument('--undump', metavar='FILEPATH', help='load a dump file into the database')
+    x14.add_argument('--dump', metavar='FILEPATH',
+                     help='create a dump file of the database')
+    x14.add_argument('--undump', metavar='FILEPATH', 
+                     help='load a dump file into the database')
 
     g2 = p.add_argument_group('document operations')
     x2 = g2.add_mutually_exclusive_group()
-    x2.add_argument('-G', '--get', metavar="DOCID", help='output the document with the given identifier')
-    x2.add_argument('-P', '--put', metavar='FILEPATH', help='store the document; arg is literal doc or filepath')
-    x2.add_argument('--delete', metavar="DOCID", help='delete the document with the given identifier')
+    x2.add_argument('-G', '--get', metavar="DOCID", 
+                    help='output the document with the given identifier')
+    x2.add_argument('-P', '--put', metavar='FILEPATH',
+                    help='store the document; arg is literal doc or filepath')
+    x2.add_argument('--delete', metavar="DOCID",
+                    help='delete the document with the given identifier')
 
     g3 = p.add_argument_group('attachments to document')
     x3 = g3.add_mutually_exclusive_group()
-    x3.add_argument('--attach', nargs=2, metavar=('DOCID', 'FILEPATH'), help='attach the specified file to the given document')
-    x3.add_argument('--detach', nargs=2, metavar=('DOCID', 'FILENAME'), help='remove the attached file from the given document')
-    x3.add_argument('--get_attach', nargs=2, metavar=('DOCID', 'FILENAME'), help='get the attached file from the given document;'
-                                                                                 " write to same filepath or that given by '-o'")
+    x3.add_argument('--attach', nargs=2, metavar=('DOCID', 'FILEPATH'),
+                    help='attach the specified file to the given document')
+    x3.add_argument('--detach', nargs=2, metavar=('DOCID', 'FILENAME'),
+                    help='remove the attached file from the given document')
+    x3.add_argument('--get_attach', nargs=2, metavar=('DOCID', 'FILENAME'),
+                    help='get the attached file from the given document;'
+                    " write to same filepath or that given by '-o'")
 
     g4 = p.add_argument_group('query a design view, returning rows')
-    g4.add_argument('--view', metavar="SPEC", help="design view '{design}/{view}' to query")
+    g4.add_argument('--view', metavar="SPEC",
+                    help="design view '{design}/{view}' to query")
     x41 = g4.add_mutually_exclusive_group()
-    x41.add_argument('--key', metavar="KEY", help="key value selecting view rows")
-    x41.add_argument('--startkey', metavar="KEY", help="start key value selecting range of view rows")
-    g4.add_argument('--endkey', metavar="KEY", help="end key value selecting range of view rows")
-    g4.add_argument('--startkey_docid', metavar="DOCID", help='return rows starting with the specified document')
-    g4.add_argument('--endkey_docid', metavar="DOCID", help='stop returning rows when specified document reached')
-    g4.add_argument('--group', action='store_true', help="group the results using the 'reduce' function")
-    g4.add_argument('--group_level', type=int, metavar='INT', help='specify the group level to use')
-    g4.add_argument('--noreduce', action='store_true', help="do not use the 'reduce' function of the view")
-    g4.add_argument('--limit', type=int, metavar='INT', help='limit the number of returned rows')
-    g4.add_argument('--skip', type=int, metavar='INT', help='skip this number of rows before returning result')
-    g4.add_argument('--descending', action='store_true', help='sort rows in descending order (swap start/end keys!)')
-    g4.add_argument('--include_docs', action='store_true', help='include documents in result')
+    x41.add_argument('--key', metavar="KEY", 
+                     help="key value selecting view rows")
+    x41.add_argument('--startkey', metavar="KEY",
+                     help="start key value selecting range of view rows")
+    g4.add_argument('--endkey', metavar="KEY",
+                    help="end key value selecting range of view rows")
+    g4.add_argument('--startkey_docid', metavar="DOCID",
+                    help='return rows starting with the specified document')
+    g4.add_argument('--endkey_docid', metavar="DOCID",
+                    help='stop returning rows when specified document reached')
+    g4.add_argument('--group', action='store_true',
+                    help="group the results using the 'reduce' function")
+    g4.add_argument('--group_level', type=int, metavar='INT',
+                    help='specify the group level to use')
+    g4.add_argument('--noreduce', action='store_true',
+                    help="do not use the 'reduce' function of the view")
+    g4.add_argument('--limit', type=int, metavar='INT',
+                    help='limit the number of returned rows')
+    g4.add_argument('--skip', type=int, metavar='INT', 
+                    help='skip this number of rows before returning result')
+    g4.add_argument('--descending', action='store_true', 
+                    help='sort rows in descending order (swap start/end keys!)')
+    g4.add_argument('--include_docs', action='store_true',
+                    help='include documents in result')
     return p
 
 
@@ -970,7 +1048,10 @@ def get_settings(pargs):
     return settings
 
 
-DEFAULT_SETTINGS = {'SERVER': 'http://localhost:5984', 'DATABASE': None, 'USERNAME': None, 'PASSWORD': None}
+DEFAULT_SETTINGS = {'SERVER': 'http://localhost:5984', 
+                    'DATABASE': None,
+                    'USERNAME': None,
+                    'PASSWORD': None}
 
 DEFAULT_SETTINGS_FILEPATHS = ['~/.couchdb2', 'settings.json']
 
@@ -1060,7 +1141,9 @@ def execute(pargs, settings):
         input = raw_input
     except NameError:
         pass
-    server = Server(href=settings['SERVER'], username=settings['USERNAME'], password=settings['PASSWORD'])
+    server = Server(href=settings['SERVER'],
+                    username=settings['USERNAME'],
+                    password=settings['PASSWORD'])
     if pargs.verbose and server.user_context:
         print('user context:', jsons(server.user_context, indent=2))
     if pargs.version:
@@ -1151,20 +1234,24 @@ def execute(pargs, settings):
             # Non-trivial decision: concluded that it is the basename of
             # the file that is the best identifier for the attachment,
             # not the entire filepath.
-            db.put_attachment(doc, infile, filename=os.path.basename(pargs.attach[1]))
+            db.put_attachment(doc, infile, 
+                              filename=os.path.basename(pargs.attach[1]))
         message(pargs, "attached file '{1}' to doc '{0}'".format(*pargs.attach))
     elif pargs.detach:
         db = get_database(server, settings)
         doc = db[pargs.detach[0]]
         db.delete_attachment(doc, pargs.detach[1])
-        message(pargs, "detached file '{1}' from doc '{0}'".format(*pargs.detach))
+        message(pargs, 
+                "detached file '{1}' from doc '{0}'".format(*pargs.detach))
     elif pargs.get_attach:
         db = get_database(server, settings)
         doc = db[pargs.get_attach[0]]
         filepath = pargs.output or pargs.get_attach[1]
         with open(filepath, 'wb') as outfile:
             outfile.write(db.get_attachment(doc, pargs.get_attach[1]).read())
-        message(pargs, "wrote file '{0}' from doc '{1}' attachment '{2}'".format(filepath, *pargs.get_attach))
+        message(pargs,
+                "wrote file '{0}' from doc '{1}' attachment '{2}'".format(
+                    filepath, *pargs.get_attach))
 
     if pargs.view:
         try:
@@ -1172,8 +1259,9 @@ def execute(pargs, settings):
         except ValueError:
             sys.exit('Error: invalid view specification')
         kwargs = {}
-        for key in (
-                'key', 'startkey', 'endkey', 'startkey_docid', 'endkey_docid', 'group', 'group_level', 'limit', 'skip', 'descending', 'include_docs'):
+        for key in ('key', 'startkey', 'endkey', 'startkey_docid',
+                    'endkey_docid', 'group', 'group_level', 'limit', 'skip',
+                    'descending', 'include_docs'):
             value = getattr(pargs, key)
             if value is not None:
                 kwargs[key] = value
