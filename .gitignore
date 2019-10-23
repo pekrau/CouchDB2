@@ -1,4 +1,5 @@
-test_settings.json
+*.json
+!example_settings.json
 *~
 build
 dist

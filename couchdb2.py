@@ -5,7 +5,7 @@ Most, but not all, features of this module work with CouchDB version < 2.0.
 Relies on requests: http://docs.python-requests.org/en/master/
 """
 
-__version__ = '1.8.1'
+__version__ = '1.8.2'
 
 # Standard packages
 import argparse
@@ -1016,7 +1016,7 @@ def get_settings(pargs):
     3) Update with values in the explicitly given settings file, if any.
     4) Modify by any command line arguments.
     """
-    settings = None
+    settings = DEFAULT_SETTINGS.copy()
     filepaths = DEFAULT_SETTINGS_FILEPATHS[:]
     if pargs.settings:
         filepaths.append(pargs.settings)
