@@ -69,7 +69,7 @@ class Server(object):
 
     def __str__(self):
         "Return a simple string representation of the server interface."
-        return "CouchDB {s.version} {s.href}".format(s=self)
+        return f"CouchDB {self.version} {self.href}"
 
     def __len__(self):
         "Return the number of user-defined databases."
@@ -267,7 +267,7 @@ class Server(object):
             try:
                 error = _ERRORS[response.status_code]
             except KeyError:
-                raise IOError("{r.status_code} {r.reason}".format(r=response))
+                raise IOError(f"{response.status_code} {response.reason}")
         if error is not None:
             raise error(response.reason)
 
@@ -316,7 +316,7 @@ class Database(object):
     def check(self):
         "Raises NotFoundError if the database does not exist."
         if not self.exists():
-            raise NotFoundError("database '{}' does not exist".format(self))
+            raise NotFoundError(f"Database '{self}' does not exist.")
 
     def create(self):
         "Create the database."
@@ -717,8 +717,8 @@ class Database(object):
                 ndocs += 1
                 # Attachments must follow their document.
                 for attname in doc.get('_attachments', dict()):
-                    info = tarfile.TarInfo(u"{0}_att/{1}".format(doc['_id'], 
-                                                                 attname))
+                    info = tarfile.TarInfo(u"{}_att/{}".format(doc['_id'],
+                                                               attname))
                     attfile = self.get_attachment(doc, attname)
                     if attfile is None:
                         attdata = ''
@@ -764,7 +764,7 @@ class Database(object):
                     self.put(doc)
                     ndocs += 1
                     for attname, attinfo in atts.items():
-                        key = u"{0}_att/{1}".format(doc['_id'], attname)
+                        key = u"{}_att/{}".format(doc['_id'], attname)
                         atts[key] = dict(filename=attname,
                                          content_type=attinfo['content_type'])
                 if ndocs % 100 == 0 and callback:
@@ -1023,7 +1023,7 @@ def get_settings(pargs):
     for filepath in filepaths:
         try:
             settings = read_settings(filepath, settings=settings)
-            verbose(pargs, 'settings read from file', filepath)
+            verbose(pargs, 'Settings read from file', filepath)
         except IOError:
             verbose(pargs, 'Warning: no settings file', filepath)
         except (ValueError, TypeError):
@@ -1044,7 +1044,7 @@ def get_settings(pargs):
             s['PASSWORD'] = None
         else:
             s['PASSWORD'] = '***'
-        verbose(pargs, 'settings:', jsons(s, indent=2))
+        verbose(pargs, 'Settings:', jsons(s, indent=2))
     return settings
 
 
@@ -1075,25 +1075,21 @@ def read_settings(filepath, settings=None):
                     pass
     return result
 
-
 def get_database(server, settings):
     "Get the database defined in the settings,"
     if not settings['DATABASE']:
         sys.exit('Error: no database defined')
     return server[settings['DATABASE']]
 
-
 def message(pargs, *args):
     "Unless flag '--silent' was used, print the arguments."
     if pargs.silent: return
     print(*args)
 
-
 def verbose(pargs, *args):
     "If flag '--verbose' was used, then print the arguments."
     if not pargs.verbose: return
     print(*args)
-
 
 def json_output(pargs, data, else_print=False):
     """If `--output` was used, write the data in JSON format to the file.
@@ -1114,11 +1110,10 @@ def json_output(pargs, data, else_print=False):
             with io.open(pargs.output, 'w', encoding='utf-8') as outfile:
                 js = json.dumps(data, ensure_ascii=False, indent=pargs.indent)
                 outfile.write(unicode(js))
-        verbose(pargs, 'wrote JSON to file', pargs.output)
+        verbose(pargs, 'Wrote JSON to file', pargs.output)
     elif else_print:
         print(jsons(data, indent=2))
     return bool(pargs.output)
-
 
 def json_input(filepath):
     "Read the JSON document file."
@@ -1126,26 +1121,20 @@ def json_input(filepath):
         with open(filepath, 'r') as infile:
             return json.load(infile, object_pairs_hook=odict)
     except (IOError, ValueError, TypeError) as error:
-        sys.exit("Error: {}".format(error))
-
+        sys.exit(f"Error: {error}")
 
 def print_dot(*args):
     "Print a dot without a newline and flush immediately."
     print('.', sep='', end='')
     sys.stdout.flush()
 
-
 def execute(pargs, settings):
     "Execution of the CouchDB2 command line tool."
-    try:
-        input = raw_input
-    except NameError:
-        pass
     server = Server(href=settings['SERVER'],
                     username=settings['USERNAME'],
                     password=settings['PASSWORD'])
     if pargs.verbose and server.user_context:
-        print('user context:', jsons(server.user_context, indent=2))
+        print('User context:', jsons(server.user_context, indent=2))
     if pargs.version:
         if not json_output(pargs, server.version):
             print(server.version)
@@ -1157,23 +1146,23 @@ def execute(pargs, settings):
 
     if pargs.create:
         db = server.create(settings['DATABASE'])
-        message(pargs, 'created database', db)
+        message(pargs, 'Created database', db)
     elif pargs.destroy:
         db = get_database(server, settings)
         if not pargs.yes:
-            answer = input("really destroy database '{}' [n] ? ".format(db))
+            answer = input(f"Really destroy database '{db}' [n] ? ")
             if answer and answer.lower()[0] in ('y', 't'):
                 pargs.yes = True
         if pargs.yes:
             db.destroy()
-            message(pargs, "destroyed database '{}".format(db))
+            message(pargs, f"Destroyed database '{db}'.")
 
     if pargs.compact:
         db = get_database(server, settings)
         if pargs.silent:
             db.compact(finish=True)
         else:
-            print("compacting '{}'.".format(db), sep='', end='')
+            print(f"Compacting '{db}'.", sep='', end='')
             sys.stdout.flush()
             db.compact(finish=True, callback=print_dot)
             print()
@@ -1204,12 +1193,12 @@ def execute(pargs, settings):
     elif pargs.put_design:
         doc = json_input(pargs.put_design[1])
         get_database(server, settings).put_design(pargs.put_design[0], doc)
-        message(pargs, 'stored design', pargs.put_design[0])
+        message(pargs, 'Stored design', pargs.put_design[0])
     elif pargs.delete_design:
         db = get_database(server, settings)
         doc = db.get_design(pargs.delete_design)
         db.delete(doc)
-        message(pargs, 'deleted design', pargs.delete_design)
+        message(pargs, 'Deleted design', pargs.delete_design)
 
     if pargs.get:
         doc = get_database(server, settings)[pargs.get.decode('utf-8')]
@@ -1220,12 +1209,12 @@ def execute(pargs, settings):
         except (ValueError, TypeError):  # Arg is filepath to doc
             doc = json_input(pargs.put)
         get_database(server, settings).put(doc)
-        message(pargs, 'stored doc', doc['_id'])
+        message(pargs, 'Stored doc', doc['_id'])
     elif pargs.delete:
         db = get_database(server, settings)
         doc = db[pargs.delete]
         db.delete(doc)
-        message(pargs, 'deleted doc', doc['_id'])
+        message(pargs, 'Deleted doc', doc['_id'])
 
     if pargs.attach:
         db = get_database(server, settings)
@@ -1236,13 +1225,13 @@ def execute(pargs, settings):
             # not the entire filepath.
             db.put_attachment(doc, infile, 
                               filename=os.path.basename(pargs.attach[1]))
-        message(pargs, "attached file '{1}' to doc '{0}'".format(*pargs.attach))
+        message(pargs, "Attached file '{1}' to doc '{0}'".format(*pargs.attach))
     elif pargs.detach:
         db = get_database(server, settings)
         doc = db[pargs.detach[0]]
         db.delete_attachment(doc, pargs.detach[1])
         message(pargs, 
-                "detached file '{1}' from doc '{0}'".format(*pargs.detach))
+                "Detached file '{1}' from doc '{0}'".format(*pargs.detach))
     elif pargs.get_attach:
         db = get_database(server, settings)
         doc = db[pargs.get_attach[0]]
@@ -1250,7 +1239,7 @@ def execute(pargs, settings):
         with open(filepath, 'wb') as outfile:
             outfile.write(db.get_attachment(doc, pargs.get_attach[1]).read())
         message(pargs,
-                "wrote file '{0}' from doc '{1}' attachment '{2}'".format(
+                "Wrote file '{0}' from doc '{1}' attachment '{2}'".format(
                     filepath, *pargs.get_attach))
 
     if pargs.view:
@@ -1275,24 +1264,23 @@ def execute(pargs, settings):
         if pargs.silent:
             db.dump(pargs.dump)
         else:
-            print("dumping '{}'.".format(db), sep='', end='')
+            print(f"Dumping '{db}'.", sep='', end='')
             sys.stdout.flush()
             ndocs, nfiles = db.dump(pargs.dump, callback=print_dot)
             print()
-            print('dumped', ndocs, 'documents,', nfiles, 'files')
+            print(f"Dumped {ndocs} documents, {nfiles} files.")
     elif pargs.undump:
         db = get_database(server, settings)
         if len(db) != 0:
-            sys.exit("database '{}' is not empty".format(db))
+            sys.exit(f"Error: Database '{db}' is not empty")
         if pargs.silent:
             db.undump(pargs.undump)
         else:
-            print("undumping '{}'.".format(db), sep='', end='')
+            print(f"Undumping '{db}'.", sep='', end='')
             sys.stdout.flush()
             ndocs, nfiles = db.undump(pargs.undump, callback=print_dot)
             print()
-            print('undumped', ndocs, 'documents,', nfiles, 'files')
-
+            print(f"Undumped {ndocs} documents, {nfiles} files.")
 
 def main():
     "Entry point for the CouchDB2 command line tool."
@@ -1306,8 +1294,7 @@ def main():
             settings['PASSWORD'] = getpass.getpass('password > ')
         execute(pargs, settings)
     except CouchDB2Exception as error:
-        sys.exit("Error: {}".format(error))
-
+        sys.exit(f"Error: {error}")
 
 if __name__ == '__main__':
     main()
