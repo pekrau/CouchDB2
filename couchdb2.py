@@ -885,11 +885,9 @@ def jsons(data, indent=None):
     "Convert data into JSON string."
     return json.dumps(data, ensure_ascii=False, indent=indent)
 
-
 def jsonod(response):
     "Return JSON using ordered dictionary."
     return response.json(object_pairs_hook=odict)
-
 
 def get_parser():
     "Get the parser for the command line tool."
@@ -1008,7 +1006,6 @@ def get_parser():
                     help='include documents in result')
     return p
 
-
 def get_settings(pargs):
     """Get the settings lookup for the command line tool.
     1) Initialize with DEFAULT_SETTINGS
@@ -1054,7 +1051,6 @@ DEFAULT_SETTINGS = {'SERVER': 'http://localhost:5984',
                     'PASSWORD': None}
 
 DEFAULT_SETTINGS_FILEPATHS = ['~/.couchdb2', 'settings.json']
-
 
 def read_settings(filepath, settings=None):
     """Read the settings lookup from a JSON format file.
