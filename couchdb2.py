@@ -420,17 +420,17 @@ class Database(object):
 
         Returns an iterable (list) over the resulting documents.
         """
-        docs = []
+        documents = []
         for doc in docs:
             if isinstance(doc, dict):
-                docs.append(doc)
+                documents.append(doc)
             elif hasattr(doc, 'items'):
-                docs.append(dict(doc.items()))
+                documents.append(dict(doc.items()))
             else:
                 raise TypeError('expected dict, got %s' % type(doc))
 
         data = self.server._POST(self.name + '/_bulk_docs',
-                                 data=json.dumps({"docs": docs}),
+                                 data=json.dumps({"docs": documents}),
                                  headers={"Content-Type": "application/json"})
 
         results = []
