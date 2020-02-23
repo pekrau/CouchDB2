@@ -1,5 +1,9 @@
 """Test the Python interface module to CouchDB v2.x.
-Uses the third-party package py.test.
+Uses the third-party package py.test, which must be installed.
+
+Execute in this directory by:
+
+$ pytest
 """
 
 # Standard packages

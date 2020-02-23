@@ -5,7 +5,7 @@ Most, but not all, features of this module work with CouchDB version < 2.0.
 Relies on requests: http://docs.python-requests.org/en/master/
 """
 
-__version__ = '1.8.2'
+__version__ = '1.8.3'
 
 # Standard packages
 import argparse
@@ -535,6 +535,8 @@ class Database(object):
         - `key`: the key for the index row.
         - `value`: the value for the index row.
         - `doc`: the document, if any.
+
+        If `include_docs` is True, then `reduce` is forced to False.
         """
         params = {}
         if startkey is not None:
@@ -561,6 +563,7 @@ class Database(object):
             params['reduce'] = jsons(bool(reduce))
         if include_docs:
             params['include_docs'] = jsons(True)
+            params['reduce'] = jsons(False)
         response = self.server._GET(self.name, '_design', designname,
                                     '_view', viewname, params=params)
         data = response.json()

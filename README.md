@@ -412,6 +412,8 @@ result = db.view(designname, viewname, key=None, keys=None,
 Return a [ViewResult](#viewresult) object, containing
 [Row](#row) objects in the attribute `rows` (a list).
 
+If `include_docs` is True, then `reduce` is forced to False.
+
 ### get_indexes
 ```python
 data = db.get_indexes()
