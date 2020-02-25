@@ -15,7 +15,8 @@ This module relies on `requests`: http://docs.python-requests.org/en/master/
 
 ## News
 
-- 1.8.4: Added **get_bulk**: Get several documents in one operation.
+- 1.8.4:
+  - Added **get_bulk**: Get several documents in one operation.
 
 ## Example code
 
