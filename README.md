@@ -15,8 +15,10 @@ This module relies on `requests`: http://docs.python-requests.org/en/master/
 
 ## News
 
+- 1.8.5
+  - Added `ids()`: Return an iterator over all document identifiers.
 - 1.8.4
-  - Added **get_bulk**: Get several documents in one operation.
+  - Added `get_bulk(ids)`: Get several documents in one operation.
 
 ## Example code
 
@@ -315,12 +317,18 @@ Return the document with the given id, or the `default` value if not found.
 ```python
 doc = db.get_bulk(ids)
 ```
-Get several documents in one operation, given a list of document ids,
+Get several documents in one operation, given a list of document `ids`,
 each of which is a string (the document id), or a tuple of the
 document id and revision.
 
-Returns a list of documents. If no document found for a specified id
-or (id, rev), the value None is returned in that slot of the list.
+Returns a list of documents. If no document is found for a specified
+id or (id, rev), `None` is returned in that slot of the list.
+
+### ids
+```python
+for id in db.ids(): ...
+```
+Return an iterator over all document identifiers.
 
 ### put
 ```python

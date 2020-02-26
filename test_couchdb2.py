@@ -189,7 +189,7 @@ def test_iterator():
     db = server.create(DBNAME)
     orig = {'field': 'data'}
     # One more than chunk size to test paging
-    N = couchdb2.Database.CHUNK_SIZE + 1
+    N = couchdb2.CHUNK_SIZE + 1
     docs = {}
     for n in range(N):
         doc = orig.copy()
@@ -198,6 +198,7 @@ def test_iterator():
         docs[doc['_id']] = doc
     assert len(db) == N
     assert docs == dict([(d['_id'], d) for d in db])
+    assert set(docs.keys()) == set(db.ids())
     db.destroy()
 
 def test_index():

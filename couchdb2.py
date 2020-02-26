@@ -5,7 +5,7 @@ Most, but not all, features of this module work with CouchDB version < 2.0.
 Relies on requests: http://docs.python-requests.org/en/master/
 """
 
-__version__ = "1.8.4"
+__version__ = "1.8.5"
 
 # Standard packages
 import argparse
@@ -27,6 +27,7 @@ import requests
 
 JSON_MIME = "application/json"
 BIN_MIME  = "application/octet-stream"
+CHUNK_SIZE = 100
 
 
 class Server(object):
@@ -275,8 +276,6 @@ class Server(object):
 class Database(object):
     "Interface to a named CouchDB database."
 
-    CHUNK_SIZE = 100
-
     def __init__(self, server, name, check=True):
         self.server = server
         self.name = name
@@ -298,7 +297,7 @@ class Database(object):
 
     def __iter__(self):
         "Return an iterator over all documents in the database."
-        return _DatabaseIterator(self, chunk_size=self.CHUNK_SIZE)
+        return _DatabaseIterator(self)
 
     def __getitem__(self, id):
         "Return the document with the given id."
@@ -385,9 +384,9 @@ class Database(object):
         return jsonod(response)
 
     def get_bulk(self, ids):
-        """Get several documents in one operation, given a list of document ids,
-        each of which is a string (the document id), or a tuple of 
-        the document id and revision.
+        """Get several documents in one operation, given a list of
+        document ids, each of which is a string (the document id),
+        or a tuple of the document id and revision.
         Returns a list of documents. If no document found for a specified
         id or (id, rev), the value None is returned in that slot of the list.
         """
@@ -399,6 +398,10 @@ class Database(object):
                 docs.append({"id": id})
         response = self.server._POST(self.name, "_bulk_get", json={"docs":docs})
         return [i["docs"][0].get("ok") for i in response.json()["results"]]
+
+    def ids(self):
+        "Return an iterator over all document identifiers."
+        return _DatabaseIterator(self, include_docs=False)
 
     def put(self, doc):
         """Insert or update the document.
@@ -792,13 +795,17 @@ class Database(object):
 
 
 class _DatabaseIterator(object):
-    "Iterator over all documents in a database."
+    "Iterator over all documents, or all document identifiers, in a database."
 
-    def __init__(self, db, chunk_size):
+    def __init__(self, db, limit=CHUNK_SIZE, include_docs=True):
         self.db = db
-        self.skip = 0
+        self.params = {"include_docs": bool(include_docs),
+                       "limit": int(limit),
+                       "skip": 0}
         self.chunk = []
-        self.chunk_size = chunk_size
+
+    def __iter__(self):
+        return self
 
     def __next__(self):
         return self.next()
@@ -807,17 +814,19 @@ class _DatabaseIterator(object):
         try:
             return self.chunk.pop()
         except IndexError:
-            response = self.db.server._GET(self.db.name, "_all_docs",
-                                           params={"include_docs": True,
-                                                   "skip": self.skip,
-                                                   "limit": self.chunk_size})
+            response = self.db.server._GET(self.db.name,
+                                           "_all_docs",
+                                           params=self.params)
             data = response.json(object_pairs_hook=odict)
             rows = data["rows"]
             if len(rows) == 0:
                 raise StopIteration
-            self.chunk = [r["doc"] for r in rows]
+            if self.params["include_docs"]:
+                self.chunk = [r["doc"] for r in rows]
+            else:
+                self.chunk = [r["id"] for r in rows]
             self.chunk.reverse()
-            self.skip = data["offset"] + len(self.chunk)
+            self.params["skip"] = data["offset"] + len(self.chunk)
             return self.chunk.pop()
 
 
