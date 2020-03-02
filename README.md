@@ -15,6 +15,9 @@ This module relies on `requests`: http://docs.python-requests.org/en/master/
 
 ## News
 
+- 1.9.0
+  - Changed `put_attachment` and `delete_attachment` to update the input
+    `doc` by the new `_rev` value.
 - 1.8.5
   - Added `ids()`: Return an iterator over all document identifiers.
 - 1.8.4
@@ -495,16 +498,21 @@ rev = db.put_attachment(doc, content, filename=None, content_type=None)
 ```
 `content` is a string or a file-like object.
 Return the new revision of the document.
-The revision in the input `doc` is **not** changed.
 
-If no filename, then an attempt is made to get it from content object.
+**Note**: Since version 1.9.0, the `_rev` item in the input `doc`
+**is** updated.
+
+If `filename` is not provided, then an attempt is made to get it from
+the `content` object.
 
 ### delete_attachment
 ```python
 rev = db.delete_attachment(doc, filename)
 ```
 Delete the attachment. Return the new revision of the document.
-The revision in the input `doc` is **not** changed.
+
+**Note**: Since version 1.9.0, the `_rev` item in the input `doc`
+**is** updated.
 
 ### dump
 ```python

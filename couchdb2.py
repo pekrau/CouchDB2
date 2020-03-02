@@ -5,7 +5,7 @@ Most, but not all, features of this module work with CouchDB version < 2.0.
 Relies on requests: http://docs.python-requests.org/en/master/
 """
 
-__version__ = "1.8.5"
+__version__ = "1.9.0"
 
 # Standard packages
 import argparse
@@ -691,7 +691,10 @@ class Database(object):
         """`content` is a string or a file-like object. Return the new
         revision of the document.
 
-        If no filename, then an attempt is made to get it from content object.
+        NOTE: Since version 1.9.0, the `_rev` of the input `doc` is updated.
+
+        If `filename` is not provided, then an attempt is made to get it
+        from the content object.
         """
         if filename is None:
             try:
@@ -705,13 +708,20 @@ class Database(object):
                                     data=content,
                                     headers={"Content-Type": content_type,
                                              "If-Match": doc["_rev"]})
-        return response.json()["rev"]
+        doc["_rev"] = response.json()["rev"]
+        # Return the new `_rev` for backwards compatibility reasons.
+        return doc["_rev"]
 
     def delete_attachment(self, doc, filename):
-        "Delete the attachment. Return the new revision of the document."
+        """Delete the attachment. Return the new revision of the document.
+
+        NOTE: Since version 1.9.0, the `_rev` of the input `doc` is updated.
+        """
         response = self.server._DELETE(self.name, doc["_id"], filename,
                                        headers={"If-Match": doc["_rev"]})
-        return response.json()["rev"]
+        doc["_rev"] = response.json()["rev"]
+        # Return the new `_rev` for backwards compatibility reasons.
+        return doc["_rev"]
 
     def dump(self, filepath, callback=None):
         """Dump the entire database to a tar file.
