@@ -34,17 +34,22 @@ class Server(object):
     "A connection to the CouchDB server."
 
     def __init__(self, href="http://localhost:5984/",
-                 username=None, password=None, use_session=True):
+                 username=None, password=None, use_session=True, ca_file=None):
         """Connect to the CouchDB server.
 
         If `use_session` is true, then an authenticated CouchDB session
         is used transparently.
 
         Otherwise, username and password is sent with each request.
+
+        `ca_file` can point to a file or a directory containing CAs if
+        you need to access databases in HTTPS.
         """
         self.href = href.rstrip("/") + "/"
         self._session = requests.Session()
         self._session.headers.update({"Accept": JSON_MIME})
+        if ca_file is not None:
+            self._session.verify = ca_file
         if username and password:
             if use_session:
                 self._POST("_session",
@@ -942,6 +947,8 @@ def get_parser():
     x01.add_argument("-p", "--password", help="CouchDB user account password")
     x01.add_argument("-q", "--password_question", action="store_true",
                      help="ask for the password by interactive input")
+    p.add_argument("--ca_file", metavar="FILEORDIRPATH",
+                   help="file or directory containing CAs")
     p.add_argument("-o", "--output", metavar="FILEPATH",
                    help="write output to the given file (JSON format)")
     p.add_argument("--indent", type=int, metavar="INT",
@@ -1166,7 +1173,8 @@ def execute(pargs, settings):
     "Execution of the CouchDB2 command line tool."
     server = Server(href=settings["SERVER"],
                     username=settings["USERNAME"],
-                    password=settings["PASSWORD"])
+                    password=settings["PASSWORD"],
+                    ca_file=pargs.ca_file)
     if pargs.verbose and server.user_context:
         print("User context:", jsons(server.user_context, indent=2))
     if pargs.version:
