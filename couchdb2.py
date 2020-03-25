@@ -5,7 +5,7 @@ Most, but not all, features of this module work with CouchDB version < 2.0.
 Relies on requests: http://docs.python-requests.org/en/master/
 """
 
-__version__ = "1.9.0"
+__version__ = "1.9.1"
 
 # Standard packages
 import argparse

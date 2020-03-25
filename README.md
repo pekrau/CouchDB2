@@ -15,6 +15,8 @@ This module relies on `requests`: http://docs.python-requests.org/en/master/
 
 ## News
 
+- 1.9.1
+  - Added `ca_file` parameter for HTTPS; thanks to https://github.com/seb4itik
 - 1.9.0
   - Changed `put_attachment` and `delete_attachment` to update the input
     `doc` by the new `_rev` value.
