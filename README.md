@@ -55,12 +55,16 @@ db.destroy()
 
 ## Server
 ```python
-server = Server(href='http://localhost:5984/', username=None, password=None, use_session=True)
+server = Server(href='http://localhost:5984/', username=None, password=None,
+                use_session=True, ca_file=None)
 ```
 Connection to the CouchDB server.
 
 If `use_session` is true, then an authenticated session is used
 transparently. Otherwise, username and password is sent with each request.
+
+`ca_file` can point to a file or a directory containing CAs if
+you need to access databases in HTTPS.
 
 ### version
 ```python
@@ -695,6 +699,8 @@ optional arguments:
                         CouchDB user account password
   -q, --password_question
                         ask for the password by interactive input
+  --ca_file FILEORDIRPATH
+                        file or directory containing CAs
   -o FILEPATH, --output FILEPATH
                         write output to the given file (JSON format)
   --indent INT          indentation level for JSON format output file
