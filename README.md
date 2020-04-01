@@ -318,9 +318,12 @@ design documents of the database.
 
 ### get
 ```python
-doc = db.get(id, rev=None, revs_info=False, default=None)
+doc = db.get(id, rev=None, revs_info=False, default=None, conflicts=False)
 ```
 Return the document with the given id, or the `default` value if not found.
+
+If conflicts is True, includes information about conflicts in document
+(in `_conflicts` attribute).
 
 ### get_bulk
 ```python
@@ -474,12 +477,15 @@ CouchDB version >= 2.0.
 ### find
 ```python
 data = db.find(selector, use_index=None, limit=None, skip=None, sort=None,
-               fields=None, bookmark=None, update=None)
+               fields=None, bookmark=None, update=None, conflicts=None)
 ```
 Select documents according to the Mango index selector.
 
 Returns a dictionary with items `docs`, `warning`, `execution_stats`
 and `bookmark`.
+
+If conflicts is True, includes information about conflicts in documents
+(in `_conflicts` attribute).
 
 CouchDB version >= 2.0.
 

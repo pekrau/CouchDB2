@@ -373,15 +373,20 @@ class Database(object):
         """
         self.server._POST(self.name, "_view_cleanup")
 
-    def get(self, id, rev=None, revs_info=False, default=None):
+    def get(self, id, rev=None, revs_info=False, default=None, conflicts=False):
         """Return the document with the given id,
         or the `default` value if not found.
+
+        If conflicts is True, includes information about conflicts in document
+        (in `_conflicts` attribute).
         """
         params = {}
         if rev is not None:
             params["rev"] = rev
         if revs_info:
             params["revs_info"] = jsons(True)
+        if conflicts:
+            params['conflicts'] = jsons(True)
         response = self.server._GET(self.name, id, errors={404: None},
                                     params=params)
         if response.status_code == 404:
@@ -636,11 +641,14 @@ class Database(object):
         self.server._DELETE(self.name, "_index", ddoc, "json", name)
 
     def find(self, selector, limit=None, skip=None, sort=None, fields=None, 
-             use_index=None, bookmark=None, update=None):
+             use_index=None, bookmark=None, update=None, conflicts=None):
         """Select documents according to the selector.
 
         Returns a dictionary with items `docs`, `warning`, `execution_stats`
         and `bookmark`.
+
+        If conflicts is True, includes information about conflicts in documents
+        (in `_conflicts` attribute).
 
         CouchDB version >= 2.0.
         """
@@ -660,6 +668,8 @@ class Database(object):
             doc["bookmark"] = bookmark
         if update is not None:
             doc["update"] = update
+        if conflicts is not None:
+            doc['conflicts'] = conflicts
         return jsonod(self.server._POST(self.name, "_find", json=doc))
 
     def explain(self, selector, limit=None, skip=None, sort=None, fields=None,
