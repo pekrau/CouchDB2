@@ -7,11 +7,14 @@ Most, but not all, features of this module work with CouchDB version < 2.0.
 
 ## Installation
 
+The CouchDB2 module is available at [PyPi](https://pypi.org/project/CouchDB2/).
+It can be installed using [pip](https://pip.pypa.io/en/stable/):
+
 ```
 $ pip install couchdb2
 ```
 
-This module relies on `requests`: http://docs.python-requests.org/en/master/
+The module relies on `requests`: http://docs.python-requests.org/en/master/
 
 ## News
 
