@@ -699,7 +699,7 @@ class Database(object):
     def get_attachment(self, doc, filename):
         "Return a file-like object containing the content of the attachment."
         response = self.server._GET(self.name, doc["_id"], filename,
-                                    headers={"If-Match": doc["_rev"]})
+                                    params={"rev": doc["_rev"]})
         return io.BytesIO(response.content)
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
