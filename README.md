@@ -18,6 +18,8 @@ The module relies on `requests`: http://docs.python-requests.org/en/master/
 
 ## News
 
+- 1.9.3
+  - Handle `get_attachment` rev/If-Match issue; thanks to https://github.com/seb4itik
 - 1.9.2
   - Added retrieve of conflicts; thanks to https://github.com/seb4itik
 - 1.9.1
