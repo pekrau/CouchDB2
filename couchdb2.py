@@ -553,7 +553,8 @@ class Database(object):
     def view(self, designname, viewname,
              key=None, keys=None, startkey=None, endkey=None,
              skip=None, limit=None, sorted=True, descending=False,
-             group=False, group_level=None, reduce=None, include_docs=False):
+             group=False, group_level=None, reduce=None, include_docs=False,
+             update=None):
         """Return a ViewResult object, containing the following attributes:
         - `rows`: the list of Row objects.
         - `offset`: the offset used for the set of rows.
@@ -593,6 +594,9 @@ class Database(object):
         if include_docs:
             params["include_docs"] = jsons(True)
             params["reduce"] = jsons(False)
+        if update is not None:
+            assert update in ["true","false","lazy"]
+            params["update"] = update
         response = self.server._GET(self.name, "_design", designname,
                                     "_view", viewname, params=params)
         data = response.json()

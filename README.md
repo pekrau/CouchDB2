@@ -450,7 +450,7 @@ result = db.view(designname, viewname, key=None, keys=None,
                  startkey=None, endkey=None, skip=None, limit=None,
                  sorted=True, descending=False,
                  group=False, group_level=None, reduce=None,
-                 include_docs=False)
+                 include_docs=False, update="true")
 ```
 Return a [ViewResult](#viewresult) object, containing
 [Row](#row) objects in the attribute `rows` (a list).
