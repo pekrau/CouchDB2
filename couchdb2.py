@@ -26,7 +26,7 @@ import uuid
 import requests
 
 JSON_MIME = "application/json"
-BIN_MIME  = "application/octet-stream"
+BIN_MIME = "application/octet-stream"
 CHUNK_SIZE = 100
 
 
@@ -85,7 +85,7 @@ class Server(object):
     def __iter__(self):
         "Return an iterator over all user-defined databases on the server."
         data = self._GET("_all_dbs").json()
-        return iter([Database(self, n, check=False) 
+        return iter([Database(self, n, check=False)
                      for n in data if not n.startswith("_")])
 
     def __getitem__(self, name):
@@ -114,9 +114,9 @@ class Server(object):
         "Get the named database."
         return Database(self, name, check=check)
 
-    def create(self, name):
+    def create(self, name, n=3, q=8):
         "Create the named database."
-        return Database(self, name, check=False).create()
+        return Database(self, name, n, q, check=False).create()
 
     def get_config(self, nodename="_local"):
         """Get the named node's configuration.
@@ -281,9 +281,11 @@ class Server(object):
 class Database(object):
     "Interface to a named CouchDB database."
 
-    def __init__(self, server, name, check=True):
+    def __init__(self, server, name, n=3, q=8, check=True):
         self.server = server
         self.name = name
+        self.n = n
+        self.q = q
         if check:
             self.check()
 
@@ -324,7 +326,7 @@ class Database(object):
 
     def create(self):
         "Create the database."
-        self.server._PUT(self.name)
+        self.server._PUT(self.name, data={"n": self.n, "q": self.q})
         return self
 
     def destroy(self):
@@ -406,7 +408,7 @@ class Database(object):
                 docs.append({"id": id[0], "rev": id[1]})
             else:
                 docs.append({"id": id})
-        response = self.server._POST(self.name, "_bulk_get", json={"docs":docs})
+        response = self.server._POST(self.name, "_bulk_get", json={"docs": docs})
         return [i["docs"][0].get("ok") for i in response.json()["results"]]
 
     def ids(self):
@@ -640,7 +642,7 @@ class Database(object):
         assert self.server.version >= "2.0"
         self.server._DELETE(self.name, "_index", ddoc, "json", name)
 
-    def find(self, selector, limit=None, skip=None, sort=None, fields=None, 
+    def find(self, selector, limit=None, skip=None, sort=None, fields=None,
              use_index=None, bookmark=None, update=None, conflicts=None):
         """Select documents according to the selector.
 
@@ -918,7 +920,7 @@ class ServerError(CouchDB2Exception):
 
 _ERRORS = {200: None,
            201: None,
-           202: None, 
+           202: None,
            304: None,
            400: BadRequestError,
            401: AuthorizationError,
@@ -934,20 +936,23 @@ def get_iuid():
     "Return a new instance unique identifier."
     return uuid.uuid4().hex
 
+
 def jsons(data, indent=None):
     "Convert data into JSON string."
     return json.dumps(data, ensure_ascii=False, indent=indent)
+
 
 def jsonod(response):
     "Return JSON using ordered dictionary."
     return response.json(object_pairs_hook=odict)
 
+
 def get_parser():
     "Get the parser for the command line tool."
     p = argparse.ArgumentParser(prog="couchdb2", usage="%(prog)s [options]",
                                 description="CouchDB v2.x command line tool,"
-                                " leveraging Python module CouchDB2.")
-    p.add_argument("--settings", metavar="FILEPATH", 
+                                            " leveraging Python module CouchDB2.")
+    p.add_argument("--settings", metavar="FILEPATH",
                    help="settings file in JSON format")
     p.add_argument("-S", "--server",
                    help="CouchDB server URL, including port number")
@@ -968,7 +973,7 @@ def get_parser():
     x02 = p.add_mutually_exclusive_group()
     x02.add_argument("-v", "--verbose", action="store_true",
                      help="print more information")
-    x02.add_argument("-s", "--silent", action="store_true", 
+    x02.add_argument("-s", "--silent", action="store_true",
                      help="print no information")
 
     g0 = p.add_argument_group("server operations")
@@ -981,13 +986,13 @@ def get_parser():
     x11 = g1.add_mutually_exclusive_group()
     x11.add_argument("--create", action="store_true",
                      help="create the database")
-    x11.add_argument("--destroy", action="store_true", 
+    x11.add_argument("--destroy", action="store_true",
                      help="delete the database and all its contents")
     g1.add_argument("--compact", action="store_true",
                     help="compact the database; may take some time")
-    g1.add_argument("--compact_design", metavar="DDOC", 
+    g1.add_argument("--compact_design", metavar="DDOC",
                     help="compact the view indexes for the named design doc")
-    g1.add_argument("--view_cleanup", action="store_true", 
+    g1.add_argument("--view_cleanup", action="store_true",
                     help="remove view index files no longer required")
     g1.add_argument("--info", action="store_true",
                     help="output information about the database")
@@ -996,9 +1001,9 @@ def get_parser():
                      help="output security information for the database")
     x12.add_argument("--set_security", metavar="FILEPATH",
                      help="set security information for the database"
-                     " from the JSON file")
+                          " from the JSON file")
     x13 = g1.add_mutually_exclusive_group()
-    x13.add_argument("--list_designs", action="store_true", 
+    x13.add_argument("--list_designs", action="store_true",
                      help="list design documents for the database")
     x13.add_argument("--design", metavar="DDOC",
                      help="output the named design document")
@@ -1009,12 +1014,12 @@ def get_parser():
     x14 = g1.add_mutually_exclusive_group()
     x14.add_argument("--dump", metavar="FILEPATH",
                      help="create a dump file of the database")
-    x14.add_argument("--undump", metavar="FILEPATH", 
+    x14.add_argument("--undump", metavar="FILEPATH",
                      help="load a dump file into the database")
 
     g2 = p.add_argument_group("document operations")
     x2 = g2.add_mutually_exclusive_group()
-    x2.add_argument("-G", "--get", metavar="DOCID", 
+    x2.add_argument("-G", "--get", metavar="DOCID",
                     help="output the document with the given identifier")
     x2.add_argument("-P", "--put", metavar="FILEPATH",
                     help="store the document; arg is literal doc or filepath")
@@ -1029,13 +1034,13 @@ def get_parser():
                     help="remove the attached file from the given document")
     x3.add_argument("--get_attach", nargs=2, metavar=("DOCID", "FILENAME"),
                     help="get the attached file from the given document;"
-                    " write to same filepath or that given by '-o'")
+                         " write to same filepath or that given by '-o'")
 
     g4 = p.add_argument_group("query a design view, returning rows")
     g4.add_argument("--view", metavar="SPEC",
                     help="design view '{design}/{view}' to query")
     x41 = g4.add_mutually_exclusive_group()
-    x41.add_argument("--key", metavar="KEY", 
+    x41.add_argument("--key", metavar="KEY",
                      help="key value selecting view rows")
     x41.add_argument("--startkey", metavar="KEY",
                      help="start key value selecting range of view rows")
@@ -1053,13 +1058,14 @@ def get_parser():
                     help="do not use the 'reduce' function of the view")
     g4.add_argument("--limit", type=int, metavar="INT",
                     help="limit the number of returned rows")
-    g4.add_argument("--skip", type=int, metavar="INT", 
+    g4.add_argument("--skip", type=int, metavar="INT",
                     help="skip this number of rows before returning result")
-    g4.add_argument("--descending", action="store_true", 
+    g4.add_argument("--descending", action="store_true",
                     help="sort rows in descending order (swap start/end keys!)")
     g4.add_argument("--include_docs", action="store_true",
                     help="include documents in result")
     return p
+
 
 def get_settings(pargs):
     """Get the settings lookup for the command line tool.
@@ -1100,12 +1106,13 @@ def get_settings(pargs):
     return settings
 
 
-DEFAULT_SETTINGS = {"SERVER": "http://localhost:5984", 
+DEFAULT_SETTINGS = {"SERVER": "http://localhost:5984",
                     "DATABASE": None,
                     "USERNAME": None,
                     "PASSWORD": None}
 
 DEFAULT_SETTINGS_FILEPATHS = ["~/.couchdb2", "settings.json"]
+
 
 def read_settings(filepath, settings=None):
     """Read the settings lookup from a JSON format file.
@@ -1126,21 +1133,25 @@ def read_settings(filepath, settings=None):
                     pass
     return result
 
+
 def get_database(server, settings):
     "Get the database defined in the settings,"
     if not settings["DATABASE"]:
         sys.exit("Error: no database defined")
     return server[settings["DATABASE"]]
 
+
 def message(pargs, *args):
     "Unless flag '--silent' was used, print the arguments."
     if pargs.silent: return
     print(*args)
 
+
 def verbose(pargs, *args):
     "If flag '--verbose' was used, then print the arguments."
     if not pargs.verbose: return
     print(*args)
+
 
 def json_output(pargs, data, else_print=False):
     """If `--output` was used, write the data in JSON format to the file.
@@ -1166,6 +1177,7 @@ def json_output(pargs, data, else_print=False):
         print(jsons(data, indent=2))
     return bool(pargs.output)
 
+
 def json_input(filepath):
     "Read the JSON document file."
     try:
@@ -1174,10 +1186,12 @@ def json_input(filepath):
     except (IOError, ValueError, TypeError) as error:
         sys.exit(f"Error: {error}")
 
+
 def print_dot(*args):
     "Print a dot without a newline and flush immediately."
     print(".", sep="", end="")
     sys.stdout.flush()
+
 
 def execute(pargs, settings):
     "Execution of the CouchDB2 command line tool."
@@ -1275,14 +1289,14 @@ def execute(pargs, settings):
             # Non-trivial decision: concluded that it is the basename of
             # the file that is the best identifier for the attachment,
             # not the entire filepath.
-            db.put_attachment(doc, infile, 
+            db.put_attachment(doc, infile,
                               filename=os.path.basename(pargs.attach[1]))
         message(pargs, "Attached file '{1}' to doc '{0}'".format(*pargs.attach))
     elif pargs.detach:
         db = get_database(server, settings)
         doc = db[pargs.detach[0]]
         db.delete_attachment(doc, pargs.detach[1])
-        message(pargs, 
+        message(pargs,
                 "Detached file '{1}' from doc '{0}'".format(*pargs.detach))
     elif pargs.get_attach:
         db = get_database(server, settings)
@@ -1334,6 +1348,7 @@ def execute(pargs, settings):
             print()
             print(f"Undumped {ndocs} documents, {nfiles} files.")
 
+
 def main():
     "Entry point for the CouchDB2 command line tool."
     try:
@@ -1347,6 +1362,7 @@ def main():
         execute(pargs, settings)
     except CouchDB2Exception as error:
         sys.exit(f"Error: {error}")
+
 
 if __name__ == "__main__":
     main()
