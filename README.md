@@ -18,6 +18,10 @@ The module relies on `requests`: http://docs.python-requests.org/en/master/
 
 ## News
 
+- 1.9.4
+  - Added `update` parameter on views; thanks to https://github.com/rbarreiro
+  - Added `n` and `q` parameters when creating a database; thanks to
+    https://github.com/elChapoSing
 - 1.9.3
   - Handle `get_attachment` rev/If-Match issue; thanks to https://github.com/seb4itik
 - 1.9.2
