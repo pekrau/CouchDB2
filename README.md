@@ -144,9 +144,10 @@ if the the database does not exist.
 
 ### create
 ```python
-db = server.create(name)
+db = server.create(name, n=3, q=8)
 ```
-Create the named database.
+Create the named database. The parameter `n` denotes the number of replicas,
+while `q` specifies the number of shards.
 
 ### get_config
 ```python
@@ -460,6 +461,9 @@ Return a [ViewResult](#viewresult) object, containing
 [Row](#row) objects in the attribute `rows` (a list).
 
 If `include_docs` is True, then `reduce` is forced to False.
+
+The argument `update` can have the values `true`, `false` and `lazy`,
+which is why it is not a simple boolean.
 
 ### get_indexes
 ```python
