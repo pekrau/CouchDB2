@@ -31,10 +31,7 @@ requests-toolbelt==0.9.1
 rfc3986==1.4.0
 SecretStorage==3.1.1
 six==1.12.0
-toml==0.10.2
-tqdm==4.38.0
-twine==3.3.0
-urllib3==1.25.6
+urllib3==1.25.8
 wcwidth==0.1.7
 webencodings==0.5.1
 zipp==0.6.0
