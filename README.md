@@ -18,6 +18,10 @@ The module relies on `requests`: http://docs.python-requests.org/en/master/
 
 ## News
 
+- 1.9.5
+  - Changed to unittest for test script. Got rid of py.test
+  - Added \_\_str\_\_ to Server class.
+  - Updated setup.py.
 - 1.9.4
   - Added `update` parameter on views; thanks to https://github.com/rbarreiro
   - Added `n` and `q` parameters when creating a database; thanks to
@@ -126,6 +130,11 @@ Does the named database exist?
 data = server()
 ```
 Return meta information about the server.
+
+### \_\_del\_\_
+
+Automatically closes the `requests` session on garbage collection of
+the instance.
 
 ### up
 ```python
