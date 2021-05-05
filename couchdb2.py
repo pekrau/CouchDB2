@@ -101,6 +101,10 @@ class Server(object):
         "Return meta information about the instance."
         return self._GET().json(object_pairs_hook=odict)
 
+    def __del__(self):
+        "Clean up: Close the requests session."
+        self._session.close()
+
     def up(self):
         """Is the server up and running, ready to respond to requests?
 

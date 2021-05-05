@@ -1,291 +1,313 @@
-"""Test the Python interface module to CouchDB v2.x.
-Uses the third-party package py.test, which must be installed.
-
-Execute in this directory by:
-
-$ pytest
-"""
+"Test the Python interface module to CouchDB v2.x."
 
 # Standard packages
 import os
 import tempfile
+import unittest
 
-# Third-party package
-import pytest
-
-# Module to test
 import couchdb2
 
-server = None
-DBNAME = "pytest"
 
-def setup_module(module):
-    "Read the settings file only once."
-    global server
-    try:
-        settings = couchdb2.read_settings("test_settings.json")
-        server = couchdb2.Server(username=settings["USERNAME"],
-                                 password=settings["PASSWORD"])
-    except IOError:
-        server = couchdb2.Server()
+class Test(unittest.TestCase):
 
-def test_server():
-    global server
-    data = server()
-    assert "version" in data
-    assert "vendor" in data
-    assert server.version
-    if server.version >= "2.0":
-        assert server.up()
-    # Cannot connect to nonsense address
-    with pytest.raises(IOError):
-        couchdb2.Server("http://localhost:123456/").version
-    if server.version >= "2.0":
-        data = server.get_config()
-        assert "vendor" in data
-        assert "log" in data
-        data = server.get_cluster_setup()
-        assert "state" in data
-        data = server.get_membership()
-        assert "all_nodes" in data
-        assert "cluster_nodes" in data
-        data = server.get_scheduler_jobs()
-        assert "jobs" in data
-        data = server.get_node_stats()
-        assert "couchdb" in data
-        assert "httpd" in data["couchdb"]
-        data = server.get_node_system()
-        assert "uptime" in data
-        assert "memory" in data
-    data = server.get_active_tasks()
-    assert isinstance(data, type([]))
+    def setUp(self):
+        self.settings = {"SERVER": "http://localhost:5984",
+                         "DATABASE": "test",
+                         "USERNAME": None,
+                         "PASSWORD": None}
+        try:
+            self.settings = couchdb2.read_settings("test_settings.json",
+                                                   self.settings)
+        except IOError:
+            pass
+        self.server = couchdb2.Server(username=self.settings["USERNAME"],
+                                      password=self.settings["PASSWORD"])
 
-def test_database():
-    # Keep track of how many databases to start with
-    count = len(server)
-    # Make sure the test database is not present
-    assert DBNAME not in server
-    with pytest.raises(couchdb2.NotFoundError):
-        db = server[DBNAME]
-    # Create the test database, and check for it
-    db = server.create(DBNAME)
-    assert DBNAME in server
-    assert len(server) == count + 1
-    # Fail to create it again
-    with pytest.raises(couchdb2.CreationError):
-        another = couchdb2.Database(server, DBNAME, check=False).create()
-    # Destroy the database, and check that it went away
-    db.destroy()
-    assert not db.exists()
-    assert DBNAME not in server
-    with pytest.raises(couchdb2.NotFoundError):
-        db = server[DBNAME]
-    assert len(server) == count
+    def tearDown(self):
+        db = self.server.get(self.settings["DATABASE"], check=False)
+        if db.exists():
+            db.destroy()
 
-def test_document_create():
-    db = server.create(DBNAME)
-    # Empty database
-    assert len(db) == 0
-    # Store a document with predefined id
-    docid = "hardwired id"
-    doc = {"_id": docid, "name": "thingy", "age": 1}
-    doc1 = doc.copy()
-    db.put(doc1)
-    # Remember keys of original document
-    keys1 = set(db.get(docid).keys())
-    assert len(db) == 1
-    # Exact copy of original document, except no "_rev"
-    doc2 = doc.copy()
-    with pytest.raises(couchdb2.RevisionError):
+    def test_00_no_such_server(self):
+        "Check the error when trying to use a non-existent server."
+        with self.assertRaises(IOError):
+            couchdb2.Server("http://localhost:123456/").version
+
+    def test_01_server(self):
+        "Test the basic data for the server."
+        data = self.server()
+        self.assertIn("version", data)
+        self.assertIn("vendor", data)
+        self.assertIsNotNone(self.server.version)
+        if self.server.version >= "2.0":
+            self.assertTrue(self.server.up())
+            data = self.server.get_config()
+            self.assertIn("log", data)
+            self.assertIn("vendor", data)
+            data = self.server.get_cluster_setup()
+            self.assertIn("state", data)
+            data = self.server.get_membership()
+            self.assertIn("all_nodes", data)
+            self.assertIn("cluster_nodes", data)
+            data = self.server.get_scheduler_jobs()
+            self.assertIn("jobs", data)
+            data = self.server.get_node_stats()
+            self.assertIn("couchdb", data)
+            self.assertIn("httpd", data["couchdb"])
+            data = self.server.get_node_system()
+            self.assertIn("uptime", data)
+            self.assertIn("memory", data)
+            data = self.server.get_active_tasks()
+            self.assertTrue(isinstance(data, type([])))
+
+    def test_02_no_database(self):
+        "Check that the specified database does not exist."
+        self.assertNotIn(self.settings["DATABASE"], self.server)
+        with self.assertRaises(couchdb2.NotFoundError):
+            db = self.server[self.settings["DATABASE"]]
+
+    def test_03_database(self):
+        "Test database creation and destruction."
+        # How many databases at start?
+        count = len(self.server)
+        # Create a database.
+        db = self.server.create(self.settings["DATABASE"])
+        self.assertIn(self.settings["DATABASE"], self.server)
+        self.assertEqual(len(self.server), count+1)
+        # Fail to create the database again.
+        with self.assertRaises(couchdb2.CreationError):
+            another = self.server.create(self.settings["DATABASE"])
+        # Destroy the recently created database.
+        db.destroy()
+        self.assertFalse(db.exists())
+        self.assertNotIn(self.settings["DATABASE"], self.server)
+        with self.assertRaises(couchdb2.NotFoundError):
+            db = self.server[self.settings["DATABASE"]]
+        self.assertEqual(len(self.server), count)
+
+    def test_04_document_create(self):
+        "Test creating a document in an empty database."
+        db = self.server.create(self.settings["DATABASE"])
+        self.assertEqual(len(db), 0)
+        # Store a document with predefined id
+        docid = "hardwired id"
+        doc = {"_id": docid, "name": "thingy", "age": 1}
+        doc1 = doc.copy()
+        db.put(doc1)
+        self.assertEqual(len(db), 1)
+        self.assertIn("_rev", doc1)
+        keys = set(db.get(docid).keys())
+        # Exact copy of original document."
+        doc2 = doc.copy()
+        # Cannot update existing document without "_rev".
+        with self.assertRaises(couchdb2.RevisionError):
+            db.put(doc2)
+        # Delete the document.
+        db.delete(doc1)
+        self.assertNotIn(doc1["_id"], db)
+        self.assertEqual(len(db), 0)
+        # Add document again.
         db.put(doc2)
-    # Delete the document, check it went away
-    db.delete(doc1)
-    assert doc1["_id"] not in db
-    assert len(db) == 0
-    db.put(doc2)
-    # Keys of this document must be equal to keys of original
-    keys2 = set(db.get(docid).keys())
-    assert keys1 == keys2
-    # A single document in database
-    assert len(db) == 1
-    db.destroy()
+        # Keys of this new document must be equal to keys of original
+        keys2 = set(db.get(docid).keys())
+        self.assertEqual(keys, keys2)
+        # A single document in database.
+        self.assertEqual(len(db), 1)
 
-def test_document_update():
-    db = server.create(DBNAME)
-    assert len(db) == 0
-    doc = {"name": "Per", "age": 59, "mood": "jolly"}
-    # Store first revision of document
-    doc1 = doc.copy()
-    db.put(doc1)
-    id1 = doc1["_id"]
-    rev1 = doc1["_rev"]
-    assert len(db) == 1
-    # Store second revision of document
-    doc2 = doc1.copy()
-    doc2["mood"] = "excellent"
-    db.put(doc2)
-    # Get the second revision
-    doc3 = db[id1]
-    assert doc3["mood"] == "excellent"
-    rev2 = doc3["_rev"]
-    assert rev1 != rev2
-    # Get the first revision
-    doc1_copy = db.get(id1, rev=rev1)
-    assert doc1_copy == doc1
-    db.destroy()
+    def test_05_document_update(self):
+        "Test updating a document."
+        db = self.server.create(self.settings["DATABASE"])
+        self.assertEqual(len(db), 0)
+        doc = {"name": "Per", "age": 61, "mood": "jolly"}
+        # Store the first revision of document.
+        doc1 = doc.copy()
+        db.put(doc1)
+        self.assertIn("_rev", doc1)
+        id1 = doc1["_id"]
+        rev1 = doc1["_rev"]
+        self.assertEqual(len(db), 1)
+        # Store a revised version of the document.
+        doc2 = doc1.copy()
+        doc2["mood"] = "excellent"
+        db.put(doc2)
+        self.assertIn("_rev", doc2)
+        # Get a new copy of the second revision.
+        doc3 = db[id1]
+        self.assertEqual(doc3["mood"], "excellent")
+        self.assertNotEqual(doc3["_rev"], rev1)
+        # Get a new copy of the first revision.
+        doc1_copy = db.get(id1, rev=rev1)
+        self.assertEqual(doc1_copy, doc1)
 
-def test_design_view():
-    db = server.create(DBNAME)
-    db.put_design("docs",
-                  {"views":
-                   {"name":
-                    {"map": "function (doc) {if (doc.name===undefined) return;"
-                            " emit(doc.name, null);}"},
-                    "name_sum":
-                    {"map": "function (doc) {emit(doc.name, doc.number);}",
-                     "reduce": "_sum"},
-                    "name_count":
-                    {"map": "function (doc) {emit(doc.name, null);}",
-                     "reduce": "_count"}
-                   }})
-    doc = {"name": "mine", "number": 2}
-    db.put(doc)
-    # Get all rows: one single
-    result = db.view("docs", "name")
-    assert len(result.rows) == 1
-    assert result.total_rows == 1
-    row = result.rows[0]
-    assert row.key == "mine"
-    assert row.value is None
-    assert row.doc is None
-    # Get all rows, with documents
-    result = db.view("docs", "name", include_docs=True)
-    assert len(result.rows) == 1
-    assert result.total_rows == 1
-    row = result.rows[0]
-    assert row.key == "mine"
-    assert row.value is None
-    assert row.doc == doc
-    # Store another document
-    doc = {"name": "another", "number": 3}
-    db.put(doc)
-    result = db.view("docs", "name_sum")
-    # Sum of all item in all documents; 1 row having no document
-    assert len(result.rows) == 1
-    assert result.rows[0].doc is None
-    assert result.rows[0].value == 5
-    # Count all documents
-    result = db.view("docs", "name_count")
-    assert len(result.rows) == 1
-    assert result.rows[0].value == 2
-    # No key "name" in document; not included in index
-    db.put({"number": 8})
-    result = db.view("docs", "name")
-    assert len(result.rows) == 2
-    assert result.total_rows == 2
-    db.destroy()
-
-def test_iterator():
-    db = server.create(DBNAME)
-    orig = {"field": "data"}
-    # One more than chunk size to test paging
-    N = couchdb2.CHUNK_SIZE + 1
-    docs = {}
-    for n in range(N):
-        doc = orig.copy()
-        doc["n"] = n
+    def test_06_design_view(self):
+        "Test design views containing reduce and count functions."
+        db = self.server.create(self.settings["DATABASE"])
+        self.assertEqual(len(db), 0)
+        db.put_design("docs",
+                      {"views":
+                       {"name":
+                        {"map": "function (doc) {if (doc.name===undefined) return;"
+                                " emit(doc.name, null);}"},
+                        "name_sum":
+                        {"map": "function (doc) {emit(doc.name, doc.number);}",
+                         "reduce": "_sum"},
+                        "name_count":
+                        {"map": "function (doc) {emit(doc.name, null);}",
+                         "reduce": "_count"}
+                       }})
+        doc = {"name": "mine", "number": 2}
         db.put(doc)
-        docs[doc["_id"]] = doc
-    assert len(db) == N
-    assert docs == dict([(d["_id"], d) for d in db])
-    assert set(docs.keys()) == set(db.ids())
-    db.destroy()
+        # Get all rows without documents: one single in result.
+        result = db.view("docs", "name")
+        self.assertEqual(len(result.rows), 1)
+        self.assertEqual(result.total_rows, 1)
+        row = result.rows[0]
+        self.assertEqual(row.key, "mine")
+        self.assertIsNone(row.value)
+        self.assertIsNone(row.doc)
+        # Get all rows, with documents.
+        result = db.view("docs", "name", include_docs=True)
+        self.assertEqual(len(result.rows), 1)
+        self.assertEqual(result.total_rows, 1)
+        row = result.rows[0]
+        self.assertEqual(row.key, "mine")
+        self.assertIsNone(row.value)
+        self.assertEqual(row.doc, doc)
+        # Store another document.
+        doc = {"name": "another", "number": 3}
+        db.put(doc)
+        # Sum of values of all fields 'number' in all documents;
+        # 1 row having no document.
+        result = db.view("docs", "name_sum")
+        self.assertEqual(len(result.rows), 1)
+        self.assertIsNone(result.rows[0].doc)
+        self.assertEqual(result.rows[0].value, 5)
+        # Count all documents.
+        result = db.view("docs", "name_count")
+        self.assertEqual(len(result.rows), 1)
+        self.assertEqual(result.rows[0].value, 2)
+        # No key "name" in document; not included in index.
+        db.put({"number": 8})
+        result = db.view("docs", "name")
+        self.assertEqual(len(result.rows), 2)
+        self.assertEqual(result.total_rows, 2)
 
-def test_index():
-    "Mango index."
-    if not server.version >= "2.0": return
-    db = server.create(DBNAME)
-    db.put({"name": "Per", "type": "person", "content": "stuff"})
-    db.put({"name": "Anders", "type": "person", "content": "other stuff"})
-    db.put({"name": "Per", "type": "computer", "content": "data"})
-    # Find without index
-    result = db.find({"type": "person"})
-    assert len(result["docs"]) == 2
-    assert result.get("warning")
-    result = db.find({"type": "computer"})
-    assert len(result["docs"]) == 1
-    result = db.find({"type": "house"})
-    assert len(result["docs"]) == 0
-    # An index for "name" item
-    db.put_index(["name"])
-    result = db.find({"name": "Per"})
-    assert len(result["docs"]) == 2
-    assert not result.get("warning")
-    # An index having a partial filter selector
-    ddocname = "mango"
-    indexname = "myindex"
-    result = db.put_index(["name"], ddoc=ddocname, name=indexname,
-                          selector={"type": "person"})
-    assert result["id"] == "_design/{}".format(ddocname)
-    assert result["name"] == indexname
-    result = db.find({"type": "person"})
-    # Does not use an index; warns about that
-    assert result.get("warning")
-    assert len(result["docs"]) == 2
-    # Use an explicit selection
-    result = db.find({"name": "Per", "type": "person"})
-    assert len(result["docs"]) == 1
-    # Same as above, implicit selection via partial index
-    result = db.find({"name": "Per"}, use_index=[ddocname, indexname])
-    assert len(result["docs"]) == 1
-    assert not result.get("warning")
-    db.destroy()
+    def test_07_iterator(self):
+        "Test database iterator over all documents."
+        db = self.server.create(self.settings["DATABASE"])
+        orig = {"field": "data"}
+        # One more document than chunk size to test paging.
+        N = couchdb2.CHUNK_SIZE + 1
+        docs = {}
+        for n in range(N):
+            doc = orig.copy()
+            doc["n"] = n
+            db.put(doc)
+            docs[doc["_id"]] = doc
+        self.assertEqual(len(db), N)
+        docs_from_iterator = dict([(d["_id"], d) for d in db])
+        self.assertEqual(docs, docs_from_iterator)
+        self.assertEqual(set(docs.keys()), set(db.ids()))
 
-def test_document_attachments():
-    db = server.create(DBNAME)
-    id = "mydoc"
-    doc = {"_id": id, "name": "myfile", "contents": "a Python file"}
-    db.put(doc)
-    rev1 = doc["_rev"]
-    # Store this file's contents as attachment
-    with open(__file__, "rb") as infile:
-        rev2 = db.put_attachment(doc, infile)
-    assert rev1 != rev2
-    assert doc["_rev"] == rev2
-    attfile = db.get_attachment(doc, __file__)
-    # Check this file's contents against attachment
-    with open(__file__, "rb") as infile:
-        assert attfile.read() == infile.read()
-    db.destroy()
+    def test_08_index(self):
+        """Test the Mango index feature.
+        Requires CouchDB server version 2 and later.
+        """
+        if not self.server.version >= "2.0": return
+        db = self.server.create(self.settings["DATABASE"])
+        self.assertEqual(len(db), 0)
+        db.put({"name": "Per", "type": "person", "content": "stuff"})
+        db.put({"name": "Anders", "type": "person", "content": "other stuff"})
+        db.put({"name": "Per", "type": "computer", "content": "data"})
+        # Find document without index; generates a warning.
+        result = db.find({"type": "person"})
+        self.assertEqual(len(result["docs"]), 2)
+        self.assertIsNotNone(result.get("warning"))
+        result = db.find({"type": "computer"})
+        self.assertEqual(len(result["docs"]), 1)
+        result = db.find({"type": "house"})
+        self.assertEqual(len(result["docs"]), 0)
+        # Add an index for "name" item.
+        db.put_index(["name"])
+        result = db.find({"name": "Per"})
+        self.assertEqual(len(result["docs"]), 2)
+        self.assertIsNone(result.get("warning"))
+        # Add an index having a partial filter selector.
+        ddocname = "mango"
+        indexname = "myindex"
+        result = db.put_index(["name"], ddoc=ddocname, name=indexname,
+                              selector={"type": "person"})
+        self.assertEqual(result["id"], "_design/{}".format(ddocname))
+        self.assertEqual(result["name"], indexname)
+        # Search does not use an index; warns about that.
+        result = db.find({"type": "person"})
+        self.assertIsNotNone(result.get("warning"))
+        self.assertEqual(len(result["docs"]), 2)
+        # Search using an explicit selection.
+        result = db.find({"name": "Per", "type": "person"})
+        self.assertEqual(len(result["docs"]), 1)
+        # Same as above, implicit selection via partial index.
+        result = db.find({"name": "Per"}, use_index=[ddocname, indexname])
+        self.assertEqual(len(result["docs"]), 1)
+        self.assertIsNone(result.get("warning"))
 
-def test_dump():
-    db = server.create(DBNAME)
-    id1 = "mydoc"
-    name1 = "myfile"
-    doc1 = {"_id": id1, "name": name1, "contents": "a Python file"}
-    db.put(doc1)
-    # Store this file's contents as attachment
-    with open(__file__, "rb") as infile:
-        db.put_attachment(doc1, infile)
-    id2 = u"åöä"
-    name2 = u"Åkersjöö"
-    doc2 = {"_id": id2, "name": name2, "contents": "ũber unter vor"}
-    db.put(doc2)
-    f = tempfile.NamedTemporaryFile(delete=False)
-    filepath = f.name
-    f.close()
-    counts1 = db.dump(filepath)
-    db.destroy()
-    db = server.create(DBNAME)
-    counts2 = db.undump(filepath)
-    os.unlink(filepath)
-    assert counts1 == counts2
-    doc1 = db[id1]
-    assert doc1["name"] == name1
-    with open(__file__, "rb") as infile:
-        file_content = infile.read()
-    attachment_content = db.get_attachment(doc1, __file__).read()
-    assert file_content == attachment_content
-    doc2 = db[id2]
-    assert doc2["name"] == name2
-    db.destroy()
+    def test_09_document_attachments(self):
+        "Test adding a file as attachment to a document."
+        db = self.server.create(self.settings["DATABASE"])
+        id = "mydoc"
+        doc = {"_id": id, "name": "myfile", "contents": "a Python file"}
+        db.put(doc)
+        rev1 = doc["_rev"]
+        # Store this Python file's contents as an attachment.
+        with open(__file__, "rb") as infile:
+            rev2 = db.put_attachment(doc, infile)
+        self.assertNotEqual(rev1, rev2)
+        self.assertEqual(doc["_rev"], rev2)
+        # Check this Python file's contents against the attachment.
+        attfile = db.get_attachment(doc, __file__)
+        attdata = attfile.read()
+        with open(__file__, "rb") as infile:
+            data = infile.read()
+        self.assertEqual(attdata, data)
+
+    def test_10_dump(self):
+        "Test dumping the contents of a database into a file."
+        db = self.server.create(self.settings["DATABASE"])
+        id1 = "mydoc"
+        name1 = "myfile"
+        doc1 = {"_id": id1, "name": name1, "contents": "a Python file"}
+        db.put(doc1)
+        # Store this Python file's contents as an attachment.
+        with open(__file__, "rb") as infile:
+            db.put_attachment(doc1, infile)
+        # Check that non-ASCII characters work in the file.
+        id2 = u"åöä"
+        name2 = u"Åkersjöö"
+        doc2 = {"_id": id2, "name": name2, "contents": "ũber unter vor"}
+        db.put(doc2)
+        # Get a filename to dump to.
+        f = tempfile.NamedTemporaryFile(delete=False)
+        filepath = f.name
+        f.close()
+        # Actually dump the database data, and then destroy the database.
+        counts1 = db.dump(filepath)
+        db.destroy()
+        self.assertFalse(db.exists())
+        # Create the database again, and undump the data.
+        db = self.server.create(self.settings["DATABASE"])
+        counts2 = db.undump(filepath)
+        os.unlink(filepath)
+        self.assertEqual(counts1, counts2)
+        # Compare the contents of the undumped database with the sources.
+        doc1 = db[id1]
+        self.assertEqual(doc1["name"], name1)
+        with open(__file__, "rb") as infile:
+            file_content = infile.read()
+        attachment_content = db.get_attachment(doc1, __file__).read()
+        self.assertEqual(file_content, attachment_content)
+        doc2 = db[id2]
+        self.assertEqual(doc2["name"], name2)
+
+
+if __name__ == "__main__":
+    unittest.main()
