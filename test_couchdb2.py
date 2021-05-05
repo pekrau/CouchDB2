@@ -39,6 +39,9 @@ class Test(unittest.TestCase):
         self.assertIn("version", data)
         self.assertIn("vendor", data)
         self.assertIsNotNone(self.server.version)
+        data = self.server.user_context
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["userCtx"]["name"], self.settings["USERNAME"])
         if self.server.version >= "2.0":
             self.assertTrue(self.server.up())
             data = self.server.get_config()

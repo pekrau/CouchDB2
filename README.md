@@ -18,10 +18,14 @@ The module relies on `requests`: http://docs.python-requests.org/en/master/
 
 ## News
 
-- 1.9.5
-  - Changed to unittest for test script. Got rid of py.test
-  - Added \_\_str\_\_ to Server class.
+- 1.9.6
+  - Changed to unittest for test script. Got rid of package `pytest`.
+  - Hide module-level functions which are just help functions for the
+    command-line tool.
+  - Cleaned up README.
   - Updated setup.py.
+- 1.9.5
+  - Added \_\_str\_\_ to Server class.
 - 1.9.4
   - Added `update` parameter on views; thanks to https://github.com/rbarreiro
   - Added `n` and `q` parameters when creating a database; thanks to
@@ -46,53 +50,51 @@ The module relies on `requests`: http://docs.python-requests.org/en/master/
 import couchdb2
 
 server = couchdb2.Server()   # Arguments required according to local setup
-db = server.create('test')
+db = server.create("test")
 
-doc1 = {'_id': 'myid', 'name': 'mydoc', 'level': 4}
+doc1 = {"_id": "myid", "name": "mydoc", "level": 4}
 db.put(doc1)
-doc = db['myid']
+doc = db["myid"]
 assert doc == doc1
 
-doc2 = {'name': 'another', 'level': 0}
+doc2 = {"name": "another", "level": 0}
 db.put(doc2)
 print(doc2)
-# {'_id': '66b5...', '_rev': '1-f3ac...', 'name': 'another', 'level': 0}
+# {"_id": "66b5...", "_rev": "1-f3ac...", "name": "another", "level": 0}
 
-db.put_design('mydesign', 
+db.put_design("mydesign", 
               {"views":
                {"name": {"map": "function (doc) {emit(doc.name, null);}"}
                }
               })
-result = db.view('mydesign', 'name', key='another', include_docs=True)
+result = db.view("mydesign", "name", key="another", include_docs=True)
 assert len(result) == 1
 print(result[0].doc)         # Same printout as above, using OrderedDict
 
 db.destroy()
 ```
 
-## Server
+## class Server
 ```python
-server = Server(href='http://localhost:5984/', username=None, password=None,
+server = Server(href="http://localhost:5984/",
+                username=None, password=None,
                 use_session=True, ca_file=None)
 ```
-Connection to the CouchDB server.
+An instance of the class is a connection to the CouchDB server.
 
-If `use_session` is true, then an authenticated session is used
-transparently. Otherwise, username and password is sent with each request.
+If `use_session` is `True`, then an authenticated session is used
+transparently. Otherwise, the values of `username` and `password` is
+sent with each request.
 
-`ca_file` can point to a file or a directory containing CAs if
+`ca_file` is a path to a file or a directory containing CAs if
 you need to access databases in HTTPS.
 
-### version
-```python
-server.version
-```
+### server.version
+
 Property attribute providing the version of the CouchDB server software.
 
-### user_context
-```python
-server.user_context
-```
+### server.user_context
+
 Property attribute providing the user context of the connection.
 
 ### \_\_str\_\_
@@ -133,113 +135,99 @@ Return meta information about the server.
 
 ### \_\_del\_\_
 
-Automatically closes the `requests` session on garbage collection of
-the instance.
+Closes the `requests` session.
 
-### up
-```python
-if server.up(): ...
-```
+Not for explicit use; it is automatically called when the Python
+garbage collection mechanism deletes the instance.
+
+### server.up()
+
 Is the server up and running, ready to respond to requests?
+Returns a boolean.
 
-CouchDB version >= 2.0.
+*CouchDB version >= 2.0*
 
-### get
-```python
-db = server.get(name, check=True)
-```
-Get the named database. If `check` is true, then raise NotFoundError
-if the the database does not exist.
+### server.get(name, check=True)
 
-### create
-```python
-db = server.create(name, n=3, q=8)
-```
+Get the named database. Returns an instance of class `Database`.
+
+Raises `NotFoundError` if `check` is `True` and the database does not exist.
+
+### server.create(name, n=3, q=2)
+
 Create the named database. The parameter `n` denotes the number of replicas,
-while `q` specifies the number of shards.
+while `q` specifies the number of shards. The default values are the same
+as for the CouchDB server since its version 3.0.0.
 
-### get_config
-```python
-data = server.get_config(nodename='_local')
-```
+### server.get_config(nodename="_local")
+
 Get the named node's configuration.
 
-### get_active_tasks
-```python
-data = server.get_active_tasks()
-```
+*CouchDB version >= 2.0*
+
+### server.get_active_tasks()
+
 Return a list of running tasks.
 
-### get_cluster_setup
-```python
-data = server.get_cluster_setup(config)
-```
-Return the status of the node or cluster.
+### server.get_cluster_setup(ensure_dbs_exists=None):
 
-CouchDB version >= 2.0.
+Return the status of the node or cluster. `ensure_dbs_exists` is a list
+system databases to ensure exist on the node/cluster. Defaults to
+`["_users","_replicator"]`.
 
-### set_cluster_setup
-```python
-server.cluster_setup(doc)
-```
-Configure a node as a single node, as part of a cluster, or finalize a cluster.
+*CouchDB version >= 2.0*
 
-CouchDB version >= 2.0.
+### server.set_cluster_setup(doc)
 
-### get_membership
-```python
-data = server.get_membership()
-```
+Configure a node as a single node, as part of a cluster, or finalise a
+cluster. See the CouchDB documentation for the contents of `doc`.
+
+*CouchDB version >= 2.0*
+
+### server.get_membership()
+
 Return data about the nodes that are part of the cluster.
 
-CouchDB version >= 2.0.
+*CouchDB version >= 2.0*
 
-### set_replicate
-```python
-data = server.set_replicate(doc)
-```
-Request, configure, or stop, a replication operation.
+### server.set_replicate(doc)
 
-### get_scheduler_jobs
-```python
-data = server.get_scheduler_jobs(limit=None, skip=None)
-```
+Request, configure, or stop, a replication operation. See the CouchDB
+documentation for the contents of `doc`.
+
+### server.get_scheduler_jobs(limit=None, skip=None)
+
 Get a list of replication jobs.
 
-CouchDB version >= 2.0.
+*CouchDB version >= 2.0*
 
-### get_scheduler_docs
-```python
-data = server.get_scheduler_docs(limit=None, skip=None,
-                                 replicator_db=None, docid=None)
-```
-Get information about replication document(s).
+### server.get_scheduler_docs(limit=None, skip=None, replicator_db=None, docid=None)
 
-CouchDB version >= 2.0.
+Get information about replication document states.
 
-### get_node_stats
-```python
-data = server.get_node_stats(nodename='_local')
-```
+*CouchDB version >= 2.0*
+
+### server.get_node_stats(nodename="_local")
+
 Return statistics for the running server.
 
-CouchDB version >= 2.0.
+*CouchDB version >= 2.0*
 
-### get_node_system
-```python
-data = server.get_node_system(nodename='_local')
-```
+### server.get_node_system(nodename="_local")
+
 Return various system-level statistics for the running server.
 
-CouchDB version >= 2.0.
+*CouchDB version >= 2.0*
 
-## Database
+## class Database
 ```python
 db = Database(server, name, check=True)
 ```
-Interface to a named CouchDB database.
 
-If `check` is true, then raise NotFoundError if the the database does not exist.
+An instance of the class is an interface to a named CouchDB database.
+
+If `check` is `True`, then raise NotFoundError if the the database
+does not exist.
 
 ### \_\_str\_\_
 ```python
@@ -271,116 +259,96 @@ doc = db[id]
 ```
 Return the document with the given id.
 
-### exists
-```python
-if db.exists(): ...
-```
-Does the database exist?
+### db.exists()
 
-### check
-```python
-db.check()
-```
+Does the database exist? Returns a boolean.
+
+### db.check()
+
 Raises NotFoundError if the database does not exist.
 
-### create
-```python
-db.create()
-```
-Create the database.
+### db.create()
 
-### destroy
-```python
-db.destroy()
-```
+Create the database. Raises CreationError if it already exists.
+
+### db.destroy()
+
 Delete the database and all its contents.
 
-### get_info
-```python
-data = db.get_info()
-```
+### db.get_info()
+
 Return a dictionary with information about the database.
 
-### get_security
-```python
-data = db.get_security()
-```
+### db.get_security()
+
 Return a dictionary with security information for the database.
 
-### set_security
-```python
-db.set_security(doc)
-```
-Set the security information for the database.
+### db.set_security(doc)
 
-### compact
-```python
-db.compact(finish=False, callback=None)
-```
+Set the security information for the database. See the CouchDB
+documentation for the contents of `doc`.
+
+### db.compact(finish=False, callback=None)
+
 Compact the CouchDB database by rewriting the disk database file
 and removing old revisions of documents.
 
-If `finish` is True, then return only when compaction is done.
+If `finish` is `True`, then return only when compaction is done.
 In addition, if defined, the function `callback(seconds)` is called
 every second until compaction is done.
 
-### compact_design
-```python
-db.compact_design(designname)
-```
+### db.compact_design(designname)
+
 Compact the view indexes associated with the named design document.
 
-### view_cleanup
-```python
-db.view_cleanup()
-```
+### db.view_cleanup()
+
 Remove unnecessary view index files due to changed views in
 design documents of the database.
 
-### get
-```python
-doc = db.get(id, rev=None, revs_info=False, default=None, conflicts=False)
-```
+### db.get(id, rev=None, revs_info=False, default=None, conflicts=False)
+
 Return the document with the given id, or the `default` value if not found.
 
-If conflicts is True, includes information about conflicts in document
-(in `_conflicts` attribute).
+If `conflicts` is `True`, the returned document includes information
+about conflicts in document (in the `_conflicts` attribute).
 
-### get_bulk
-```python
-doc = db.get_bulk(ids)
-```
-Get several documents in one operation, given a list of document `ids`,
-each of which is a string (the document id), or a tuple of the
-document id and revision.
+### db.get_bulk(ids)
+
+Get several documents in one operation, given a list of document identifiers,
+each of which is a string (the document `\_id`), or a tuple of the
+document `\_id` and `\_rev`.
 
 Returns a list of documents. If no document is found for a specified
-id or (id, rev), `None` is returned in that slot of the list.
+`\_id` or `(\_id, \_rev`), `None` is returned in that slot of the list.
 
-### ids
+### db.ids()
 ```python
-for id in db.ids(): ...
+for docid in db.ids(): ...
 ```
-Return an iterator over all document identifiers.
 
-### put
-```python
-db.put(doc)
-```
+Returns an iterator over all document identifiers.
+
+### db.put(doc)
+
 Insert or update the document.
 
 If the document is already in the database, the `_rev` item must
 be present in the document; its value will be updated.
 
 If the document does not contain an item `_id`, one will be added
-having a UUID4 value. The `_rev` item will also be added.
+having a hex UUID4 value. The `_rev` item will also be added.
 
-### update
-```python
-db.update(docs)
-```
+### db.update(docs)
+
 Perform a bulk update or insertion of the given documents using a
 single HTTP request.
+
+Returns an iterable (list) over the resulting documents.
+
+`docs` : a sequence of dictionaries or `Document` objects, or
+objects providing a `items()` method that can be used to convert
+them to a dictionary.
 
 The return value of this method is a list containing a tuple for every
 element in the `docs` sequence. Each tuple is of the form
@@ -391,55 +359,38 @@ an exception instance (e.g. `ResourceConflict`) if the update failed.
 
 If an object in the documents list is not a dictionary, this method
 looks for an `items()` method that can be used to convert the object
-to a dictionary. Effectively this means you can also use this method
-with `mapping.Document` objects.
-
-`docs` : a sequence of dictionaries or `Document` objects, or
-objects providing a `items()` method that can be used to convert
-them to a dictionary.
+to a dictionary.
                   
-Returns an iterable (list) over the resulting documents.
+### db.delete(doc)
 
-### delete
-```python
-db.delete(doc)
-```
-Delete the document.
+Delete the document, which must contain the `_id` and `_rev` items.
 
-### purge
-```python
-db.purge(docs)
-```
-Perform purging (complete removing) of the given documents.
+### db.purge(docs)
+
+Perform purging (complete removal) of the given list of documents.
 
 Uses a single HTTP request to purge all given documents. Purged
 documents do not leave any meta-data in the storage and are not
 replicated.
 
-### get_designs
-```python
-data = db.get_designs()
-```
+### db.get_designs()
+
 Return the design documents for the database.
 
-CouchDB version >= 2.2.
+*CouchDB version >= 2.0*
 
-### get_design
-```python
-data = db.get_design(designname)
-```
+### db.get_design(designname)
+
 Get the named design document.
 
-### put_design
-```python
-db.put_design(designname, doc, rebuild=True)
-```
+### db.put_design(designname, doc, rebuild=True)
+
 Insert or update the design document under the given name.
 
 If the existing design document is identical, no action is taken and
-False is returned, else the document is updated and True is returned.
+`False` is returned, else the document is updated and `True` is returned.
 
-If `rebuild` is True, force view indexes to be rebuilt after update. 
+If `rebuild` is `True`, force view indexes to be rebuilt after update. 
 This may take some time.
 
 Example of doc:
@@ -458,45 +409,53 @@ Example of doc:
 
 More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
 
-### view
-```python
-result = db.view(designname, viewname, key=None, keys=None,
-                 startkey=None, endkey=None, skip=None, limit=None,
-                 sorted=True, descending=False,
-                 group=False, group_level=None, reduce=None,
-                 include_docs=False, update="true")
-```
-Return a [ViewResult](#viewresult) object, containing
-[Row](#row) objects in the attribute `rows` (a list).
+### db.view(designname, viewname, **kwargs)
 
-If `include_docs` is True, then `reduce` is forced to False.
+Return a [ViewResult](#viewresult) instance, containing
+[Row](#row) instances in the attribute `rows` (a list).
 
-The argument `update` can have the values `true`, `false` and `lazy`,
-which is why it is not a simple boolean.
+Keyword arguments; default value is `None` unless specified:
 
-### get_indexes
-```python
-data = db.get_indexes()
-```
-Return a list of all indexes in the database.
+- `key`: Return only rows that match the specified key.
+- `keys`: Return only rows where they key matches one of those specified as a list.
+- `startkey`: Return rows starting with the specified key.
+- `endkey`: Stop returning rows when the specified key is reached.
+- `skip`: Skip the number of rows before starting to return rows.
+- `limit`: Limit the number of rows returned.
+- `sorted=True`: Sort the rows by the key of each returned row. The items
+  `total_rows` and `offset` are not available if set to `False`.
+- `descending=False`: Return the rows in descending order.
+- `group=False`: Group the results using the reduce function of the design
+  document to a group or a single row. If set to `True` implies `reduce`
+  to `True` and defaults the `group_level` to the maximum.
+- `group_level`: Specify the group level to use. Implies `group` is `True`.
+- `reduce`: If set to `False` then do not use the reduce function if there is
+  one defined in the design document. Default is to use the reduce function
+  if defined.
+- `include_docs=False`: If `True`, include the document for each row. This
+  will force `reduce` to `False`.
+- `update="true"`: Whether ir not the view should be updated prior to
+  returning the result. Supported value are `"true"`, `"false"` and `"lazy"`.
 
-CouchDB version >= 2.0.
+### db.get_indexes()
 
-### put_index
-```python
-db.put_index(fields, ddoc=None, name=None, selector=None)
-```
-Store a Mango index specification. CouchDB v2.x only.
+Return a list of all Mango indexes in the database.
 
-- `fields` is a list of fields to index.
-- `ddoc` is the design document name. Generated if none given.
-- `name` is the name of the index. Generated if none given.
-- `selector` is a partial filter selector, which may be omitted.
+*CouchDB version >= 2.0*
+
+### db.put_index(fields, ddoc=None, name=None, selector=None)
+
+Store a Mango index specification.
+
+- `fields`: A list of fields to index.
+- `ddoc`: The design document name. Generated if none given.
+- `name`: The name of the index. Generated if none given.
+- `selector`: A partial filter selector, which may be omitted.
 
 Returns a dictionary with items `id` (design document name; sic!),
 `name` (index name) and `result` (`created` or `exists`).
 
-CouchDB version >= 2.0.
+*CouchDB version >= 2.0*
 
 ### find
 ```python
@@ -508,10 +467,10 @@ Select documents according to the Mango index selector.
 Returns a dictionary with items `docs`, `warning`, `execution_stats`
 and `bookmark`.
 
-If conflicts is True, includes information about conflicts in documents
+If `conflicts` is `True`, includes information about conflicts in documents
 (in `_conflicts` attribute).
 
-CouchDB version >= 2.0.
+*CouchDB version >= 2.0*
 
 ### explain
 ```python
@@ -520,7 +479,7 @@ data = db.explain(selector, use_index=None, limit=None, skip=None, sort=None,
 ```
 Return info on which index is being used by the query.
 
-CouchDB version >= 2.0.
+*CouchDB version >= 2.0*
 
 ### get_attachment
 ```python
@@ -579,52 +538,41 @@ NOTE: The documents are just added to the database, ignoring any
 A tuple `(ndocs, nfiles)` is returned.
 
 ## CouchDB2Exception
-```python
-CouchDB2Exception()
-```
-Base CouchDB2 exception.
+
+The Base CouchDB2 exception, from which all others derive.
+
 ## NotFoundError
-```python
-NotFoundError()
-```
-No such entity exists.
+
+No such entity (e.g. database or document) exists.
+
 ## BadRequestError
-```python
-BadRequestError()
-```
+
 Invalid request; bad name, body or headers.
+
 ## CreationError
-```python
-CreationError()
-```
+
 Could not create the entity; it exists already.
+
 ## RevisionError
-```python
-RevisionError()
-```
+
 Wrong or missing `_rev` item in the document to save.
+
 ## AuthorizationError
-```python
-AuthorizationError()
-```
+
 Current user not authorized to perform the operation.
+
 ## ContentTypeError
-```python
-ContentTypeError()
-```
+
 Bad `Content-Type` value in the request.
+
 ## ServerError
-```python
-ServerError()
-```
-Internal server error.
-## ViewResult
 
-Object returned as result from `db.view()`.
+Internal CouchDB server error.
 
-```python
-ViewResult(rows, offset, total_rows)
-```
+## class ViewResult(rows, offset, total_rows)
+
+An instance of this class is returned as result from `db.view()`.
+
 Attributes:
 
 - `rows`: the list of `Row` objects.
@@ -649,51 +597,37 @@ row = viewresult[i]
 ```
 Return the indexed view result row.
 
-### json
-```python
-data = viewresult.json()
-```
-Return view result data in a JSON-like representation.
+### json()
 
-## Row
+Return the view result data in a JSON-like representation.
+
+## class Row(id, key, value, doc)
 
 Named-tuple object returned in ViewResult list attribute `rows`.
 
-```python
-Row(id, key, value, doc)
-```
+Attributes:
 
-- `id`: the identifier of the document, if any.
-- `key`: the key for the index row.
-- `value`: the value for the index row.
-- `doc`: the document, if any.
+- `id`: the identifier of the document, if any. Alias for `row[0]`.
+- `key`: the key for the index row. Alias for `row[1]`.
+- `value`: the value for the index row. Alias for `row[2]`.
+- `doc`: the document, if any. Alias for `row[3]`.
 
-### id
-Alias for field number 0
-### key
-Alias for field number 1
-### value
-Alias for field number 2
-### doc
-Alias for field number 3
+## Utility functions at the module level
 
-## Utility functions
+### read_settings(filepath, settings=None)
 
-### read_settings
-```python
-read_settings(filepath, settings=None)
-```
 Read the settings lookup from a JSON format file.
+
 If `settings` is given, then return an updated copy of it,
-else copy the default settings, update, and return.
+else copy the default settings, update, and return it.
 
 ## Command line tool
 
 The module is also a command line tool for interacting with the CouchDB server.
-Installing it using `pip` will set up the command `couchdb2`.
+It is installed if `pip` is used to install this module.
 
 Settings for the command line tool are updated from the following sources,
-in the order given and if existing:
+each in the order given and if it exists:
 
 1) Default values are
    ```
@@ -707,6 +641,8 @@ in the order given and if existing:
 2) Read from the JSON file `~/.couchdb2` (in your home directory).
 3) Read from the JSON file `settings.json` (in the current working directory).
 4) Read from the JSON file given by command line option `--settings FILEPATH`.
+5) From environment variables.
+6) From command line arguments.
 
 ### Options
 

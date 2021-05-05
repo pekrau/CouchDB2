@@ -2,27 +2,30 @@
 
 Most, but not all, features of this module work with CouchDB version < 2.0.
 
-Relies on requests: http://docs.python-requests.org/en/master/
+Relies on 'requests': http://docs.python-requests.org/en/master/
 """
 
-__version__ = "1.9.5"
+__version__ = "1.9.6"
 
 # Standard packages
 import argparse
 import collections
-from collections import OrderedDict as odict  # Required before Python 3.7
 import getpass
 import gzip
 import io
 import json
 import mimetypes
+import os
 import os.path
-import sys
 import tarfile
+import sys
 import time
 import uuid
 
-# Third-party package
+if sys.version_info[:2] < (3, 7):
+    from collections import OrderedDict as dict
+
+# Third-party package: https://docs.python-requests.org/en/master/
 import requests
 
 JSON_MIME = "application/json"
@@ -59,19 +62,11 @@ class Server(object):
 
     @property
     def version(self):
-        try:
-            return self._version
-        except AttributeError:
-            self._version = self._GET().json()["version"]
-            return self._version
+        return self._GET().json()["version"]
 
     @property
     def user_context(self):
-        try:
-            return self._user_context
-        except AttributeError:
-            self._user_context = jsonod(self._GET("_session"))
-            return self._user_context
+        return self._GET("_session").json(object_pairs_hook=dict)
 
     def __str__(self):
         "Return a simple string representation of the server interface."
@@ -99,7 +94,7 @@ class Server(object):
 
     def __call__(self):
         "Return meta information about the instance."
-        return self._GET().json(object_pairs_hook=odict)
+        return self._GET().json(object_pairs_hook=dict)
 
     def __del__(self):
         "Clean up: Close the requests session."
@@ -107,6 +102,7 @@ class Server(object):
 
     def up(self):
         """Is the server up and running, ready to respond to requests?
+        Returns a boolean.
 
         CouchDB version >= 2.0.
         """
@@ -120,7 +116,7 @@ class Server(object):
 
     def create(self, name, n=3, q=8):
         "Create the named database."
-        return Database(self, name, n, q, check=False).create()
+        return Database(self, name, n=n, q=q, check=False).create()
 
     def get_config(self, nodename="_local"):
         """Get the named node's configuration.
@@ -128,11 +124,11 @@ class Server(object):
         CouchDB version >= 2.0.
         """
         assert self.version >= "2.0"
-        return jsonod(self._GET("_node", nodename, "_config"))
+        return self._GET("_node", nodename, "_config").json(object_pairs_hook=dict)
 
     def get_active_tasks(self):
         "Return a list of running tasks."
-        return jsonod(self._GET("_active_tasks"))
+        return self._GET("_active_tasks").json(object_pairs_hook=dict)
 
     def get_cluster_setup(self, ensure_dbs_exists=None):
         """Return the status of the node or cluster.
@@ -144,7 +140,7 @@ class Server(object):
             params = {}
         else:
             params = {"ensure_dbs_exists": ensure_dbs_exists}
-        return jsonod(self._GET("_cluster_setup", params=params))
+        return self._GET("_cluster_setup", params=params).json(object_pairs_hook=dict)
 
     def set_cluster_setup(self, doc):
         """Configure a node as a single node, as part of a cluster,
@@ -161,7 +157,7 @@ class Server(object):
         CouchDB version >= 2.0.
         """
         assert self.version >= "2.0"
-        return jsonod(self._GET("_membership"))
+        return self._GET("_membership").json(object_pairs_hook=dict)
 
     def set_replicate(self, doc, is_transient=False):
         "Request, configure, or stop, a replication operation."
@@ -182,10 +178,9 @@ class Server(object):
             params["limit"] = jsons(limit)
         if skip is not None:
             params["skip"] = jsons(skip)
-        return jsonod(self._GET("_scheduler/jobs", params=params))
+        return self._GET("_scheduler/jobs", params=params).json(object_pairs_hook=dict)
 
-    def get_scheduler_docs(self, limit=None, skip=None,
-                           replicator_db=None, docid=None):
+    def get_scheduler_docs(self, limit=None, skip=None, replicator_db=None, docid=None):
         """Get information about replication document(s).
 
         CouchDB version >= 2.0.
@@ -201,7 +196,7 @@ class Server(object):
             args.append(replicator_db)
             if docid is not None:
                 args.append(docid)
-        return jsonod(self._GET(*args, params=params))
+        return self._GET(*args, params=params).json(object_pairs_hook=dict)
 
     def get_node_stats(self, nodename="_local"):
         """"Return statistics for the running server.
@@ -209,7 +204,7 @@ class Server(object):
         CouchDB version >= 2.0.
         """
         assert self.version >= "2.0"
-        return jsonod(self._GET("_node", nodename, "_stats"))
+        return self._GET("_node", nodename, "_stats").json(object_pairs_hook=dict)
 
     def get_node_system(self, nodename="_local"):
         """Return various system-level statistics for the running server.
@@ -217,7 +212,7 @@ class Server(object):
         CouchDB version >= 2.0.
         """
         assert self.version >= "2.0"
-        return jsonod(self._GET("_node", nodename, "_system"))
+        return self._GET("_node", nodename, "_system").json(object_pairs_hook=dict)
 
     def _HEAD(self, *segments, **kwargs):
         "HTTP HEAD request to the CouchDB server."
@@ -260,7 +255,7 @@ class Server(object):
         return self.href + "/".join(segments)
 
     def _kwargs(self, kwargs, *keys):
-        """Return the kwargs for the specified keys."""
+        "Return the kwargs for the specified keys."
         result = {}
         for key in keys:
             try:
@@ -270,7 +265,7 @@ class Server(object):
         return result
 
     def _check(self, response, errors={}):
-        """Raise an exception if the response status code indicates an error."""
+        "Raise an exception if the response status code indicates an error."
         try:
             error = errors[response.status_code]
         except KeyError:
@@ -285,7 +280,7 @@ class Server(object):
 class Database(object):
     "Interface to a named CouchDB database."
 
-    def __init__(self, server, name, n=3, q=8, check=True):
+    def __init__(self, server, name, n=3, q=2, check=True):
         self.server = server
         self.name = name
         self.n = n
@@ -319,7 +314,7 @@ class Database(object):
             return result
 
     def exists(self):
-        "Does the database exist?"
+        "Does the database exist? Return a boolean."
         response = self.server._HEAD(self.name, errors={404: None})
         return response.status_code == 200
 
@@ -329,7 +324,7 @@ class Database(object):
             raise NotFoundError(f"Database '{self}' does not exist.")
 
     def create(self):
-        "Create the database."
+        "Create the database. Raises CreationError if it already exists."
         self.server._PUT(self.name, data={"n": self.n, "q": self.q})
         return self
 
@@ -339,11 +334,11 @@ class Database(object):
 
     def get_info(self):
         "Return a dictionary with information about the database."
-        return jsonod(self.server._GET(self.name))
+        return self.server._GET(self.name).json(object_pairs_hook=dict)
 
     def get_security(self):
         "Return a dictionary with security information for the database."
-        return jsonod(self.server._GET(self.name, "_security"))
+        return self.server._GET(self.name, "_security").json(object_pairs_hook=dict)
 
     def set_security(self, doc):
         "Set the security information for the database."
@@ -383,8 +378,8 @@ class Database(object):
         """Return the document with the given id,
         or the `default` value if not found.
 
-        If conflicts is True, includes information about conflicts in document
-        (in `_conflicts` attribute).
+        If conflicts is True, the returned document includes information
+        about conflicts in document (in `_conflicts` attribute).
         """
         params = {}
         if rev is not None:
@@ -397,14 +392,16 @@ class Database(object):
                                     params=params)
         if response.status_code == 404:
             return default
-        return jsonod(response)
+        return response.json(object_pairs_hook=dict)
 
     def get_bulk(self, ids):
         """Get several documents in one operation, given a list of
-        document ids, each of which is a string (the document id),
-        or a tuple of the document id and revision.
+        document identifiers, each of which is a string (the document `_id`),
+        or a tuple of the document `_id` and `_rev`.
+
         Returns a list of documents. If no document found for a specified
-        id or (id, rev), the value None is returned in that slot of the list.
+        `_id` or `(_id, rev)`, the value None is returned in that slot
+        of the list.
         """
         docs = []
         for id in ids:
@@ -429,13 +426,19 @@ class Database(object):
         with a IUID value. The `_rev` item is also added.
         """
         if "_id" not in doc:
-            doc["_id"] = get_iuid()
+            doc["_id"] = uuid.uuid4().hex
         response = self.server._PUT(self.name, doc["_id"], json=doc)
         doc["_rev"] = response.json()["rev"]
 
     def update(self, docs):
         """Perform a bulk update or insertion of the given documents using a
         single HTTP request.
+
+        Returns an iterable (list) over the resulting documents.
+
+        `docs`: a sequence of dictionaries or `Document` objects, or
+        objects providing a `items()` method that can be used to convert
+        them to a dictionary.
 
         The return value of this method is a list containing a tuple for every
         element in the `docs` sequence. Each tuple is of the form
@@ -446,14 +449,7 @@ class Database(object):
 
         If an object in the docs list is not a dictionary, this method
         looks for an `items()` method that can be used to convert the object
-        to a dictionary. Effectively this means you can also use this method
-        with `mapping.Document` objects.
-
-        `docs`: a sequence of dictionaries or `Document` objects, or
-        objects providing a `items()` method that can be used to convert
-        them to a dictionary.
-
-        Returns an iterable (list) over the resulting documents.
+        to a dictionary.
         """
         documents = []
         for doc in docs:
@@ -477,7 +473,7 @@ class Database(object):
         return results
 
     def delete(self, doc):
-        "Delete the document."
+        "Delete the document, which must contain the _id and _rev items."
         if "_id" not in doc:
             raise NotFoundError("missing '_id' item in the document")
         if "_rev" not in doc:
@@ -486,7 +482,7 @@ class Database(object):
                                        headers={"If-Match": doc["_rev"]})
 
     def purge(self, docs):
-        """Perform purging (complete removing) of the given documents.
+        """Perform purging (complete removal) of the given list of documents.
 
         Uses a single HTTP request to purge all given documents. Purged
         documents do not leave any meta-data in the storage and are not
@@ -512,11 +508,11 @@ class Database(object):
         CouchDB version >= 2.2.
         """
         assert self.server.version >= "2.2"
-        return jsonod(self.server._GET(self.name, "_design_docs"))
+        return self.server._GET(self.name, "_design_docs").json(object_pairs_hook=dict)
 
     def get_design(self, designname):
         "Get the named design document."
-        return jsonod(self.server._GET(self.name, "_design", designname))
+        return self.server._GET(self.name, "_design", designname).json(object_pairs_hook=dict)
 
     def put_design(self, designname, doc, rebuild=True):
         """Insert or update the design document under the given name.
@@ -545,7 +541,7 @@ class Database(object):
         response = self.server._GET(self.name, "_design", designname,
                                     errors={404: None})
         if response.status_code == 200:
-            current_doc = response.json(object_pairs_hook=odict)
+            current_doc = response.json(object_pairs_hook=dict)
             doc["_id"] = current_doc["_id"]
             doc["_rev"] = current_doc["_rev"]
             if doc == current_doc:
@@ -617,7 +613,7 @@ class Database(object):
         CouchDB version >= 2.0.
         """
         assert self.server.version >= "2.0"
-        return jsonod(self.server._GET(self.name, "_index"))
+        return self.server._GET(self.name, "_index").json(object_pairs_hook=dict)
 
     def put_index(self, fields, ddoc=None, name=None, selector=None):
         """Store a Mango index specification.
@@ -640,7 +636,7 @@ class Database(object):
             doc["name"] = name
         if selector is not None:
             doc["index"]["partial_filter_selector"] = selector
-        return jsonod(self.server._POST(self.name, "_index", json=doc))
+        return self.server._POST(self.name, "_index", json=doc).json(object_pairs_hook=dict)
 
     def delete_index(ddoc, name):
         """Delete the named index.
@@ -680,7 +676,7 @@ class Database(object):
             doc["update"] = update
         if conflicts is not None:
             doc['conflicts'] = conflicts
-        return jsonod(self.server._POST(self.name, "_find", json=doc))
+        return self.server._POST(self.name, "_find", json=doc).json(object_pairs_hook=dict)
 
     def explain(self, selector, limit=None, skip=None, sort=None, fields=None,
                 use_index=None, bookmark=None, update=None):
@@ -704,7 +700,7 @@ class Database(object):
             doc["bookmark"] = bookmark
         if update is not None:
             doc["update"] = update
-        return jsonod(self.server._POST(self.name, "_explain", json=doc))
+        return self.server._POST(self.name, "_explain", json=doc).json(object_pairs_hook=dict)
 
     def get_attachment(self, doc, filename):
         "Return a file-like object containing the content of the attachment."
@@ -815,7 +811,7 @@ class Database(object):
                     nfiles += 1
                 else:
                     doc = json.loads(itemdata.decode("utf-8"),
-                                     object_pairs_hook=odict)
+                                     object_pairs_hook=dict)
                     doc.pop("_rev", None)
                     atts = doc.pop("_attachments", dict())
                     self.put(doc)
@@ -852,7 +848,7 @@ class _DatabaseIterator(object):
             response = self.db.server._GET(self.db.name,
                                            "_all_docs",
                                            params=self.params)
-            data = response.json(object_pairs_hook=odict)
+            data = response.json(object_pairs_hook=dict)
             rows = data["rows"]
             if len(rows) == 0:
                 raise StopIteration
@@ -884,7 +880,7 @@ class ViewResult(object):
 
     def json(self):
         "Return data in a JSON-like representation."
-        result = odict()
+        result = dict()
         result["total_rows"] = self.total_rows
         result["offset"] = self.offset
         result["rows"] = [r._asdict() for r in self]
@@ -923,7 +919,7 @@ class ContentTypeError(CouchDB2Exception):
 
 
 class ServerError(CouchDB2Exception):
-    "Internal server error."
+    "Internal CouchDB server error."
 
 
 _ERRORS = {200: None,
@@ -940,19 +936,9 @@ _ERRORS = {200: None,
            500: ServerError}
 
 
-def get_iuid():
-    "Return a new instance unique identifier."
-    return uuid.uuid4().hex
-
-
 def jsons(data, indent=None):
     "Convert data into JSON string."
     return json.dumps(data, ensure_ascii=False, indent=indent)
-
-
-def jsonod(response):
-    "Return JSON using ordered dictionary."
-    return response.json(object_pairs_hook=odict)
 
 
 def get_parser():
@@ -1080,7 +1066,8 @@ def get_settings(pargs):
     1) Initialize with DEFAULT_SETTINGS
     2) Update with values in JSON file in DEFAULT_SETTINGS_FILEPATHS, if any.
     3) Update with values in the explicitly given settings file, if any.
-    4) Modify by any command line arguments.
+    4) Update from environment variables.
+    5) Update from command line arguments.
     """
     settings = DEFAULT_SETTINGS.copy()
     filepaths = DEFAULT_SETTINGS_FILEPATHS[:]
@@ -1089,11 +1076,16 @@ def get_settings(pargs):
     for filepath in filepaths:
         try:
             settings = read_settings(filepath, settings=settings)
-            verbose(pargs, "Settings read from file", filepath)
+            _verbose(pargs, "Settings read from file", filepath)
         except IOError:
-            verbose(pargs, "Warning: no settings file", filepath)
+            _verbose(pargs, "Warning: no settings file", filepath)
         except (ValueError, TypeError):
             sys.exit("Error: bad settings file", filepath)
+    for key in ["SERVER", "DATABASE", "USERNAME", "PASSWORD"]:
+        try:
+            settings[key] = os.environ[key]
+        except KeyError:
+            pass
     if pargs.server:
         settings["SERVER"] = pargs.server
     if pargs.database:
@@ -1103,14 +1095,14 @@ def get_settings(pargs):
     if pargs.password:
         settings["PASSWORD"] = pargs.password
     if pargs.verbose:
-        s = odict()
+        s = dict()
         for key in ["SERVER", "DATABASE", "USERNAME"]:
             s[key] = settings[key]
         if settings["PASSWORD"] is None:
             s["PASSWORD"] = None
         else:
             s["PASSWORD"] = "***"
-        verbose(pargs, "Settings:", jsons(s, indent=2))
+        print("Settings:", jsons(s, indent=2))
     return settings
 
 
@@ -1142,26 +1134,23 @@ def read_settings(filepath, settings=None):
     return result
 
 
-def get_database(server, settings):
+def _get_database(server, settings):
     "Get the database defined in the settings,"
     if not settings["DATABASE"]:
         sys.exit("Error: no database defined")
     return server[settings["DATABASE"]]
 
-
-def message(pargs, *args):
+def _message(pargs, *args):
     "Unless flag '--silent' was used, print the arguments."
     if pargs.silent: return
     print(*args)
 
-
-def verbose(pargs, *args):
+def _verbose(pargs, *args):
     "If flag '--verbose' was used, then print the arguments."
     if not pargs.verbose: return
     print(*args)
 
-
-def json_output(pargs, data, else_print=False):
+def _json_output(pargs, data, else_print=False):
     """If `--output` was used, write the data in JSON format to the file.
     The indentation level is set by `--indent`.
     If the filepath ends in `.gz`. then a gzipped file is produced.
@@ -1180,28 +1169,25 @@ def json_output(pargs, data, else_print=False):
             with io.open(pargs.output, "w", encoding="utf-8") as outfile:
                 js = json.dumps(data, ensure_ascii=False, indent=pargs.indent)
                 outfile.write(unicode(js))
-        verbose(pargs, "Wrote JSON to file", pargs.output)
+        _verbose(pargs, "Wrote JSON to file", pargs.output)
     elif else_print:
         print(jsons(data, indent=2))
     return bool(pargs.output)
-
 
 def json_input(filepath):
     "Read the JSON document file."
     try:
         with open(filepath, "r") as infile:
-            return json.load(infile, object_pairs_hook=odict)
+            return json.load(infile, object_pairs_hook=dict)
     except (IOError, ValueError, TypeError) as error:
         sys.exit(f"Error: {error}")
 
-
-def print_dot(*args):
+def _print_dot(*args):
     "Print a dot without a newline and flush immediately."
     print(".", sep="", end="")
     sys.stdout.flush()
 
-
-def execute(pargs, settings):
+def _execute(pargs, settings):
     "Execution of the CouchDB2 command line tool."
     server = Server(href=settings["SERVER"],
                     username=settings["USERNAME"],
@@ -1210,88 +1196,88 @@ def execute(pargs, settings):
     if pargs.verbose and server.user_context:
         print("User context:", jsons(server.user_context, indent=2))
     if pargs.version:
-        if not json_output(pargs, server.version):
+        if not _json_output(pargs, server.version):
             print(server.version)
     if pargs.list:
         dbs = list(server)
-        if not json_output(pargs, [str(db) for db in dbs]):
+        if not _json_output(pargs, [str(db) for db in dbs]):
             for db in dbs:
                 print(db)
 
     if pargs.create:
         db = server.create(settings["DATABASE"])
-        message(pargs, "Created database", db)
+        _message(pargs, "Created database", db)
     elif pargs.destroy:
-        db = get_database(server, settings)
+        db = _get_database(server, settings)
         if not pargs.yes:
             answer = input(f"Really destroy database '{db}' [n] ? ")
             if answer and answer.lower()[0] in ("y", "t"):
                 pargs.yes = True
         if pargs.yes:
             db.destroy()
-            message(pargs, f"Destroyed database '{db}'.")
+            _message(pargs, f"Destroyed database '{db}'.")
 
     if pargs.compact:
-        db = get_database(server, settings)
+        db = _get_database(server, settings)
         if pargs.silent:
             db.compact(finish=True)
         else:
             print(f"Compacting '{db}'.", sep="", end="")
             sys.stdout.flush()
-            db.compact(finish=True, callback=print_dot)
+            db.compact(finish=True, callback=_print_dot)
             print()
     if pargs.compact_design:
-        get_database(server, settings).compact_design(pargs.compact_design)
+        _get_database(server, settings).compact_design(pargs.compact_design)
     if pargs.view_cleanup:
-        get_database(server, settings).view_cleanup()
+        _get_database(server, settings).view_cleanup()
 
     if pargs.info:
-        db = get_database(server, settings)
-        json_output(pargs, db.get_info(), else_print=True)
+        db = _get_database(server, settings)
+        _json_output(pargs, db.get_info(), else_print=True)
 
     if pargs.security:
-        db = get_database(server, settings)
-        json_output(pargs, db.get_security(), else_print=True)
+        db = _get_database(server, settings)
+        _json_output(pargs, db.get_security(), else_print=True)
     elif pargs.set_security:
-        db = get_database(server, settings)
+        db = _get_database(server, settings)
         db.set_security(json_input(pargs.set_security))
 
     if pargs.list_designs:
-        data = get_database(server, settings).get_designs()
-        if not json_output(pargs, data):
+        data = _get_database(server, settings).get_designs()
+        if not _json_output(pargs, data):
             for row in data["rows"]:
                 print(row["id"][len("_design/"):])
     elif pargs.design:
-        db = get_database(server, settings)
-        json_output(pargs, db.get_design(pargs.get_design), else_print=True)
+        db = _get_database(server, settings)
+        _json_output(pargs, db.get_design(pargs.get_design), else_print=True)
     elif pargs.put_design:
         doc = json_input(pargs.put_design[1])
-        get_database(server, settings).put_design(pargs.put_design[0], doc)
-        message(pargs, "Stored design", pargs.put_design[0])
+        _get_database(server, settings).put_design(pargs.put_design[0], doc)
+        _message(pargs, "Stored design", pargs.put_design[0])
     elif pargs.delete_design:
-        db = get_database(server, settings)
+        db = _get_database(server, settings)
         doc = db.get_design(pargs.delete_design)
         db.delete(doc)
-        message(pargs, "Deleted design", pargs.delete_design)
+        _message(pargs, "Deleted design", pargs.delete_design)
 
     if pargs.get:
-        doc = get_database(server, settings)[pargs.get.decode("utf-8")]
-        json_output(pargs, doc, else_print=True)
+        doc = _get_database(server, settings)[pargs.get.decode("utf-8")]
+        _json_output(pargs, doc, else_print=True)
     elif pargs.put:
         try:  # Attempt to interpret arg as explicit doc
-            doc = json.loads(pargs.put, object_pairs_hook=odict)
+            doc = json.loads(pargs.put, object_pairs_hook=dict)
         except (ValueError, TypeError):  # Arg is filepath to doc
             doc = json_input(pargs.put)
-        get_database(server, settings).put(doc)
-        message(pargs, "Stored doc", doc["_id"])
+        _get_database(server, settings).put(doc)
+        _message(pargs, "Stored doc", doc["_id"])
     elif pargs.delete:
-        db = get_database(server, settings)
+        db = _get_database(server, settings)
         doc = db[pargs.delete]
         db.delete(doc)
-        message(pargs, "Deleted doc", doc["_id"])
+        _message(pargs, "Deleted doc", doc["_id"])
 
     if pargs.attach:
-        db = get_database(server, settings)
+        db = _get_database(server, settings)
         doc = db[pargs.attach[0]]
         with open(pargs.attach[1], "rb") as infile:
             # Non-trivial decision: concluded that it is the basename of
@@ -1299,22 +1285,22 @@ def execute(pargs, settings):
             # not the entire filepath.
             db.put_attachment(doc, infile,
                               filename=os.path.basename(pargs.attach[1]))
-        message(pargs, "Attached file '{1}' to doc '{0}'".format(*pargs.attach))
+        _message(pargs, "Attached file '{1}' to doc '{0}'".format(*pargs.attach))
     elif pargs.detach:
-        db = get_database(server, settings)
+        db = _get_database(server, settings)
         doc = db[pargs.detach[0]]
         db.delete_attachment(doc, pargs.detach[1])
-        message(pargs,
+        _message(pargs,
                 "Detached file '{1}' from doc '{0}'".format(*pargs.detach))
     elif pargs.get_attach:
-        db = get_database(server, settings)
+        db = _get_database(server, settings)
         doc = db[pargs.get_attach[0]]
         filepath = pargs.output or pargs.get_attach[1]
         with open(filepath, "wb") as outfile:
             outfile.write(db.get_attachment(doc, pargs.get_attach[1]).read())
-        message(pargs,
-                "Wrote file '{0}' from doc '{1}' attachment '{2}'".format(
-                    filepath, *pargs.get_attach))
+        _message(pargs,
+                 "Wrote file '{0}' from doc '{1}' attachment '{2}'".format(
+                     filepath, *pargs.get_attach))
 
     if pargs.view:
         try:
@@ -1330,21 +1316,21 @@ def execute(pargs, settings):
                 kwargs[key] = value
         if pargs.noreduce:
             kwargs["reduce"] = False
-        result = get_database(server, settings).view(design, view, **kwargs)
-        json_output(pargs, result.json(), else_print=True)
+        result = _get_database(server, settings).view(design, view, **kwargs)
+        _json_output(pargs, result.json(), else_print=True)
 
     if pargs.dump:
-        db = get_database(server, settings)
+        db = _get_database(server, settings)
         if pargs.silent:
             db.dump(pargs.dump)
         else:
             print(f"Dumping '{db}'.", sep="", end="")
             sys.stdout.flush()
-            ndocs, nfiles = db.dump(pargs.dump, callback=print_dot)
+            ndocs, nfiles = db.dump(pargs.dump, callback=_print_dot)
             print()
             print(f"Dumped {ndocs} documents, {nfiles} files.")
     elif pargs.undump:
-        db = get_database(server, settings)
+        db = _get_database(server, settings)
         if len(db) != 0:
             sys.exit(f"Error: Database '{db}' is not empty")
         if pargs.silent:
@@ -1352,7 +1338,7 @@ def execute(pargs, settings):
         else:
             print(f"Undumping '{db}'.", sep="", end="")
             sys.stdout.flush()
-            ndocs, nfiles = db.undump(pargs.undump, callback=print_dot)
+            ndocs, nfiles = db.undump(pargs.undump, callback=_print_dot)
             print()
             print(f"Undumped {ndocs} documents, {nfiles} files.")
 
@@ -1367,7 +1353,7 @@ def main():
         settings = get_settings(pargs)
         if pargs.password_question:
             settings["PASSWORD"] = getpass.getpass("password > ")
-        execute(pargs, settings)
+        _execute(pargs, settings)
     except CouchDB2Exception as error:
         sys.exit(f"Error: {error}")
 
