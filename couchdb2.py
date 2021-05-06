@@ -34,19 +34,19 @@ CHUNK_SIZE = 100
 
 
 class Server(object):
-    "A connection to the CouchDB server."
+    "An instance of the class is a connection to the CouchDB server."
 
     def __init__(self, href="http://localhost:5984/",
                  username=None, password=None, use_session=True, ca_file=None):
-        """Connect to the CouchDB server.
+        """An instance of the class is a connection to the CouchDB server.
 
         - `href` is the URL to the CouchDB server itself.
         - `username` and `password` specify the CouchDB user account to use.
         - If `use_session` is `True`, then an authenticated session is used
-        transparently. Otherwise, the values of `username` and `password` are
-        sent with each request.
+          transparently. Otherwise, the values of `username` and `password` are
+          sent with each request.
         - `ca_file` is a path to a file or a directory containing CAs if
-        you need to access databases in HTTPS.
+          you need to access databases in HTTPS.
         """
         self.href = href.rstrip("/") + "/"
         self._session = requests.Session()
@@ -62,7 +62,7 @@ class Server(object):
 
     @property
     def version(self):
-        "Return the version of the CouchDB server software."
+        "Returns the version of the CouchDB server software."
         try:
             return self._version
         except AttributeError:
@@ -71,26 +71,26 @@ class Server(object):
 
     @property
     def user_context(self):
-        "Return the user context of the connection."
+        "Returns the user context of the connection."
         return self._GET("_session").json(object_pairs_hook=dict)
 
     def __str__(self):
-        "Return a simple string representation of the server interface."
+        "Returns a simple string representation of the server interface."
         return f"CouchDB {self.version} {self.href}"
 
     def __len__(self):
-        "Return the number of user-defined databases."
+        "Returns the number of user-defined databases."
         data = self._GET("_all_dbs").json()
         return len([n for n in data if not n.startswith("_")])
 
     def __iter__(self):
-        "Return an iterator over all user-defined databases on the server."
+        "Returns an iterator over all user-defined databases on the server."
         data = self._GET("_all_dbs").json()
         return iter([Database(self, n, check=False)
                      for n in data if not n.startswith("_")])
 
     def __getitem__(self, name):
-        "Get the named database."
+        "Gets the named database."
         return Database(self, name, check=True)
 
     def __contains__(self, name):
@@ -99,11 +99,11 @@ class Server(object):
         return response.status_code == 200
 
     def __call__(self):
-        "Return meta information about the instance."
+        "Returns meta information about the instance."
         return self._GET().json(object_pairs_hook=dict)
 
     def __del__(self):
-        "Clean up: Close the 'requests' session."
+        "Clean-up: Close the 'requests' session."
         self._session.close()
 
     def up(self):
@@ -117,7 +117,7 @@ class Server(object):
         return response.status_code == 200
 
     def get(self, name, check=True):
-        """Get the named database. Returns an instance of class `Database`.
+        """Gets the named database. Returns an instance of class `Database`.
 
         Raises `NotFoundError` if `check` is `True` and the database
         does not exist.
@@ -125,7 +125,7 @@ class Server(object):
         return Database(self, name, check=check)
 
     def create(self, name, n=3, q=8, partitioned=False):
-        """Create the named database. Raises `CreationError` if it
+        """Creates the named database. Raises `CreationError` if it
         already exists.
 
         - `name`: The name of the database.
@@ -137,15 +137,15 @@ class Server(object):
         return db.create(n=n, q=q, partitioned=partitioned)
 
     def get_config(self, nodename="_local"):
-        "Get the named node's configuration."
+        "Gets the named node's configuration."
         return self._GET("_node", nodename, "_config").json(object_pairs_hook=dict)
 
     def get_active_tasks(self):
-        "Return a list of running tasks."
+        "Returns a list of running tasks."
         return self._GET("_active_tasks").json(object_pairs_hook=dict)
 
     def get_cluster_setup(self, ensure_dbs_exists=None):
-        """Return the status of the node or cluster.
+        """Returns the status of the node or cluster.
 
         `ensure_dbs_exists` is a list system databases to ensure exist on the
         node/cluster. Defaults to `["_users","_replicator"]`.
@@ -160,7 +160,7 @@ class Server(object):
         return self._GET("_cluster_setup", params=params).json(object_pairs_hook=dict)
 
     def set_cluster_setup(self, doc):
-        """Configure a node as a single node, as part of a cluster,
+        """Configures a node as a single node, as part of a cluster,
         or finalize a cluster.
 
         See the CouchDB documentation for the contents of `doc`.
@@ -171,7 +171,7 @@ class Server(object):
         self._POST("_cluster_setup", json=doc)
 
     def get_membership(self):
-        """Return data about the nodes that are part of the cluster.
+        """Returns data about the nodes that are part of the cluster.
 
         CouchDB version >= 2.0
         """
@@ -186,7 +186,7 @@ class Server(object):
         return self._POST("_replicate", json=doc)
 
     def get_scheduler_jobs(self, limit=None, skip=None):
-        """Get a list of replication jobs.
+        """Gets a list of replication jobs.
 
         - 'limit': How many results to return.
         - 'skip': How many result to skip starting at the beginning,
@@ -200,7 +200,7 @@ class Server(object):
         return self._GET("_scheduler/jobs", params=params).json(object_pairs_hook=dict)
 
     def get_scheduler_docs(self, limit=None, skip=None):
-        """Get information about replication document(s).
+        """Gets information about replication document(s).
 
         - 'limit': How many results to return.
         - 'skip': How many result to skip starting at the beginning,
@@ -214,11 +214,11 @@ class Server(object):
         return self._GET("_scheduler/docs", params=params).json(object_pairs_hook=dict)
 
     def get_node_stats(self, nodename="_local"):
-        "Return statistics for the running server."
+        "Returns statistics for the running server."
         return self._GET("_node", nodename, "_stats").json(object_pairs_hook=dict)
 
     def get_node_system(self, nodename="_local"):
-        "Return various system-level statistics for the running server."
+        "Returns various system-level statistics for the running server."
         return self._GET("_node", nodename, "_system").json(object_pairs_hook=dict)
 
     def _HEAD(self, *segments, **kwargs):
@@ -285,7 +285,7 @@ class Server(object):
 
 
 class Database(object):
-    "Interface to a named CouchDB database."
+    "An instance of the class is an interface to a CouchDB database."
 
     def __init__(self, server, name, check=True):
         self.server = server
@@ -294,11 +294,11 @@ class Database(object):
             self.check()
 
     def __str__(self):
-        "Return the name of the CouchDB database."
+        "Returns the name of the CouchDB database."
         return self.name
 
     def __len__(self):
-        "Return the number of documents in the database."
+        "Returns the number of documents in the database."
         return self.server._GET(self.name).json()["doc_count"]
 
     def __contains__(self, id):
@@ -307,11 +307,11 @@ class Database(object):
         return response.status_code in (200, 304)
 
     def __iter__(self):
-        "Return an iterator over all documents in the database."
+        "Returns an iterator over all documents in the database."
         return _DatabaseIterator(self)
 
     def __getitem__(self, id):
-        "Return the document with the given id."
+        "Returns the document with the given id."
         result = self.get(id)
         if result is None:
             raise NotFoundError("no such document")
@@ -329,7 +329,7 @@ class Database(object):
             raise NotFoundError(f"Database '{self}' does not exist.")
 
     def create(self, n=3, q=8, partitioned=False):
-        """Create the database. Raises 'CreationError' if it already exists.
+        """Creates the database. Raises 'CreationError' if it already exists.
 
         - `n`: The number of replicas.
         - `q`: The number of shards.
@@ -340,26 +340,26 @@ class Database(object):
         return self
 
     def destroy(self):
-        "Delete the database and all its contents."
+        "Deletes the database and all its contents."
         self.server._DELETE(self.name)
 
     def get_info(self):
-        "Return a dictionary with information about the database."
+        "Returns a dictionary with information about the database."
         return self.server._GET(self.name).json(object_pairs_hook=dict)
 
     def get_security(self):
-        "Return a dictionary with security information for the database."
+        "Returns a dictionary with security information for the database."
         return self.server._GET(self.name, "_security").json(object_pairs_hook=dict)
 
     def set_security(self, doc):
-        """Set the security information for the database.
+        """Sets the security information for the database.
 
         See the CouchDB documentation for the contents of `doc`.
         """
         self.server._PUT(self.name, "_security", json=doc)
 
     def compact(self, finish=False, callback=None):
-        """Compact the CouchDB database by rewriting the disk database file
+        """Compacts the CouchDB database by rewriting the disk database file
         and removing old revisions of documents.
 
         - If `finish` is True, then return only when compaction is done.
@@ -378,18 +378,18 @@ class Database(object):
                 response = self.server._GET(self.name)
 
     def compact_design(self, designname):
-        "Compact the view indexes associated with the named design document."
+        "Compacts the view indexes associated with the named design document."
         self.server._POST(self.name, "_compact", designname,
                           headers={"Content-Type": JSON_MIME})
 
     def view_cleanup(self):
-        """Remove unnecessary view index files due to changed views in
+        """Removes unnecessary view index files due to changed views in
         design documents of the database.
         """
         self.server._POST(self.name, "_view_cleanup")
 
     def get(self, id, default=None, rev=None, revs_info=False, conflicts=False):
-        """Return the document with the given identifier,
+        """Returns the document with the given identifier,
         or the `default` value if not found.
 
         - `rev`: Retrieves document of specified revision, if specified.
@@ -413,7 +413,7 @@ class Database(object):
         return response.json(object_pairs_hook=dict)
 
     def get_bulk(self, ids):
-        """Get several documents in one operation, given a list of
+        """Gets several documents in one operation, given a list of
         document identifiers, each of which is a string (the document `_id`),
         or a tuple of the document `_id` and `_rev`.
 
@@ -431,11 +431,11 @@ class Database(object):
         return [i["docs"][0].get("ok") for i in response.json()["results"]]
 
     def ids(self):
-        "Return an iterator over all document identifiers."
+        "Returns an iterator over all document identifiers."
         return _DatabaseIterator(self, include_docs=False)
 
     def put(self, doc):
-        """Insert or update the document.
+        """Inserts or updates the document.
 
         If the document is already in the database, the `_rev` item must
         be present in the document, and it will be updated.
@@ -449,7 +449,7 @@ class Database(object):
         doc["_rev"] = response.json()["rev"]
 
     def update(self, docs):
-        """Perform a bulk update or insertion of the given documents using a
+        """Performs a bulk update or insertion of the given documents using a
         single HTTP request.
 
         Returns an iterable (list) over the resulting documents.
@@ -491,7 +491,7 @@ class Database(object):
         return results
 
     def delete(self, doc):
-        "Delete the document, which must contain the _id and _rev items."
+        "Deletes the document, which must contain the _id and _rev items."
         if "_id" not in doc:
             raise NotFoundError("missing '_id' item in the document")
         if "_rev" not in doc:
@@ -500,7 +500,7 @@ class Database(object):
                                        headers={"If-Match": doc["_rev"]})
 
     def purge(self, docs):
-        """Perform purging (complete removal) of the given list of documents.
+        """Performs purging (complete removal) of the given list of documents.
 
         Uses a single HTTP request to purge all given documents. Purged
         documents do not leave any meta-data in the storage and are not
@@ -521,7 +521,7 @@ class Database(object):
         return data.json()
 
     def get_designs(self):
-        """Return the design documents for the database.
+        """Returns the design documents for the database.
 
         **NOTE:** CouchDB version >= 2.2.
         """
@@ -529,11 +529,11 @@ class Database(object):
         return self.server._GET(self.name, "_design_docs").json(object_pairs_hook=dict)
 
     def get_design(self, designname):
-        "Get the named design document."
+        "Gets the named design document."
         return self.server._GET(self.name, "_design", designname).json(object_pairs_hook=dict)
 
     def put_design(self, designname, doc, rebuild=True):
-        """Insert or update the design document under the given name.
+        """Inserts or updates the design document under the given name.
 
         If the existing design document is identical, no action is taken and
         False is returned, else the document is updated and True is returned.
@@ -576,18 +576,7 @@ class Database(object):
              skip=None, limit=None, sorted=True, descending=False,
              group=False, group_level=None, reduce=None, include_docs=False,
              update=None):
-        """Return a ViewResult instance, containing the following attributes:
-
-        - `rows`: the list of Row instances.
-        - `offset`: the offset used for the set of rows.
-        - `total_rows`: the total number of rows selected.
-
-        A Row object contains the following attributes:
-
-        - `id`: the identifier of the document, if any.
-        - `key`: the key for the index row.
-        - `value`: the value for the index row.
-        - `doc`: the document, if any.
+        """Query a view index to obtain data and/or documents.
 
         Keyword arguments:
 
@@ -616,6 +605,19 @@ class Database(object):
         - `update="true"`: Whether ir not the view should be updated prior to
           returning the result. Supported value are `"true"`, `"false"`
           and `"lazy"`.
+
+        Returns a ViewResult instance, containing the following attributes:
+
+        - `rows`: the list of Row instances.
+        - `offset`: the offset used for the set of rows.
+        - `total_rows`: the total number of rows selected.
+
+        A Row object contains the following attributes:
+
+        - `id`: the identifier of the document, if any.
+        - `key`: the key for the index row.
+        - `value`: the value for the index row.
+        - `doc`: the document, if any.
         """
         params = {}
         if startkey is not None:
@@ -655,7 +657,7 @@ class Database(object):
                           data.get("total_rows"))
 
     def get_indexes(self):
-        """Return a list of all indexes in the database.
+        """Returns a list of all indexes in the database.
 
         CouchDB version >= 2.0
         """
@@ -663,7 +665,7 @@ class Database(object):
         return self.server._GET(self.name, "_index").json(object_pairs_hook=dict)
 
     def put_index(self, fields, ddoc=None, name=None, selector=None):
-        """Store a Mango index specification.
+        """Stores a Mango index specification.
 
         - `fields` is a list of fields to index.
         - `ddoc` is the design document name. Generated if none given.
@@ -685,13 +687,13 @@ class Database(object):
             doc["index"]["partial_filter_selector"] = selector
         return self.server._POST(self.name, "_index", json=doc).json(object_pairs_hook=dict)
 
-    def delete_index(ddoc, name):
-        """Delete the named index.
+    def delete_index(designname, name):
+        """Deletes the named index in the design document of the given name.
 
         CouchDB version >= 2.0
         """
         assert self.server.version >= "2.0"
-        self.server._DELETE(self.name, "_index", ddoc, "json", name)
+        self.server._DELETE(self.name, "_index", designname, "json", name)
 
     def find(self, selector, limit=None, skip=None, sort=None, fields=None,
              use_index=None, bookmark=None, update=True, conflicts=False):
@@ -736,8 +738,8 @@ class Database(object):
             doc["bookmark"] = bookmark
         return self.server._POST(self.name, "_find", json=doc).json(object_pairs_hook=dict)
 
-    def explain(self, selector, limit=None, skip=None, sort=None, fields=None,
-                bookmark=None, update=False):
+    def explain(self, selector, limit=None, skip=None, 
+                sort=None, fields=None, bookmark=None):
         """Return info on which index is being used by the query.
 
         - `limit`: Maximum number of results returned.
@@ -749,7 +751,6 @@ class Database(object):
           be returned. If omitted, return the entire document.
         - `bookmark`: A string that marks the end the previous set of results.
           If given, the next set of results will be returned.
-        - `update`: Whether to update the index prior to returning the result.
 
         CouchDB version >= 2.0
         """
@@ -768,14 +769,14 @@ class Database(object):
         return self.server._POST(self.name, "_explain", json=doc).json(object_pairs_hook=dict)
 
     def get_attachment(self, doc, filename):
-        "Return a file-like object containing the content of the attachment."
+        "Returns a file-like object containing the content of the attachment."
         response = self.server._GET(self.name, doc["_id"], filename,
                                     params={"rev": doc["_rev"]})
         return io.BytesIO(response.content)
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
-        """Add or update the given file as an attachment to the given document
-        in the database.
+        """Adds or updates the given file as an attachment to 
+        the given document in the database.
 
         - `content` is a string or a file-like object.
         - If `filename` is not provided, then an attempt is made to get it from
@@ -784,9 +785,8 @@ class Database(object):
           the filename extension is made. If that does not work, it is
           set to `"application/octet-stream"`
 
-        Returns the new revision of the document.
-
-        NOTE: Since version 1.9.0, the `_rev` of the input `doc` is updated.
+        Returns the new revision of the document, in addition to updating
+        the `_rev` field in the document.
         """
         if filename is None:
             try:
@@ -805,9 +805,10 @@ class Database(object):
         return doc["_rev"]
 
     def delete_attachment(self, doc, filename):
-        """Delete the attachment. Return the new revision of the document.
+        """Deletes the attachment.
 
-        NOTE: Since version 1.9.0, the `_rev` of the input `doc` is updated.
+        Returns the new revision of the document, in addition to updating
+        the `_rev` field in the document.
         """
         response = self.server._DELETE(self.name, doc["_id"], filename,
                                        headers={"If-Match": doc["_rev"]})
@@ -816,9 +817,9 @@ class Database(object):
         return doc["_rev"]
 
     def dump(self, filepath, callback=None):
-        """Dump the entire database to a `tar` file.
+        """Dumps the entire database to a `tar` file.
 
-        Return a tuple `(ndocs, nfiles)` giving the number of documents
+        Returns a tuple `(ndocs, nfiles)` giving the number of documents
         and attached files written out.
 
         If defined, the function `callback(ndocs, nfiles)` is called
@@ -858,10 +859,10 @@ class Database(object):
         return (ndocs, nfiles)
 
     def undump(self, filepath, callback=None):
-        """Load the `tar` file given by the path. It must have been
+        """Loads the `tar` file given by the path. It must have been
         produced by `db.dump`.
 
-        Return a tuple `(ndocs, nfiles)` giving the number of documents
+        Returns a tuple `(ndocs, nfiles)` giving the number of documents
         and attached files read from the file.
 
         If defined, the function `callback(ndocs, nfiles)` is called
