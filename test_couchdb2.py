@@ -142,7 +142,24 @@ class Test(unittest.TestCase):
         doc1_copy = db.get(id1, rev=rev1)
         self.assertEqual(doc1_copy, doc1)
 
-    def test_06_design_view(self):
+    def test_06_document_bulk(self):
+        "Test getting documents in bulk."
+        db = self.server.create(self.settings["DATABASE"])
+        self.assertEqual(len(db), 0)
+        doc1 = {"name": "Per", "age": 61, "mood": "jolly"}
+        db.put(doc1)
+        self.assertIn("_id", doc1)
+        doc2 = {"name": "Anders", "age": 56, "mood": "happy"}
+        db.put(doc2)
+        self.assertIn("_id", doc2)
+        docs = db.get_bulk([doc1["_id"], doc2["_id"]])
+        self.assertEqual(len(docs), 2)
+        self.assertIn(doc1, docs)
+        self.assertIn(doc2, docs)
+        docs = [d for d in docs if d is not None]
+        self.assertEqual(len(docs), 2)
+
+    def test_07_design_view(self):
         "Test design views containing reduce and count functions."
         db = self.server.create(self.settings["DATABASE"])
         self.assertEqual(len(db), 0)
@@ -163,11 +180,17 @@ class Test(unittest.TestCase):
         # Get all rows without documents: one single in result.
         result = db.view("docs", "name")
         self.assertEqual(len(result.rows), 1)
+        self.assertEqual(result.offset, 0)
         self.assertEqual(result.total_rows, 1)
         row = result.rows[0]
         self.assertEqual(row.key, "mine")
         self.assertIsNone(row.value)
         self.assertIsNone(row.doc)
+        # Get all rows without sorting results.
+        result = db.view("docs", "name", sorted=False)
+        self.assertEqual(len(result.rows), 1)
+        self.assertIsNone(result.offset)
+        self.assertIsNone(result.total_rows)
         # Get all rows, with documents.
         result = db.view("docs", "name", include_docs=True)
         self.assertEqual(len(result.rows), 1)
@@ -195,7 +218,7 @@ class Test(unittest.TestCase):
         self.assertEqual(len(result.rows), 2)
         self.assertEqual(result.total_rows, 2)
 
-    def test_07_iterator(self):
+    def test_08_iterator(self):
         "Test database iterator over all documents."
         db = self.server.create(self.settings["DATABASE"])
         orig = {"field": "data"}
@@ -212,7 +235,7 @@ class Test(unittest.TestCase):
         self.assertEqual(docs, docs_from_iterator)
         self.assertEqual(set(docs.keys()), set(db.ids()))
 
-    def test_08_index(self):
+    def test_09_index(self):
         """Test the Mango index feature.
         Requires CouchDB server version 2 and later.
         """
@@ -254,7 +277,7 @@ class Test(unittest.TestCase):
         self.assertEqual(len(result["docs"]), 1)
         self.assertIsNone(result.get("warning"))
 
-    def test_09_document_attachments(self):
+    def test_10_document_attachments(self):
         "Test adding a file as attachment to a document."
         db = self.server.create(self.settings["DATABASE"])
         id = "mydoc"
@@ -273,7 +296,7 @@ class Test(unittest.TestCase):
             data = infile.read()
         self.assertEqual(attdata, data)
 
-    def test_10_dump(self):
+    def test_11_dump(self):
         "Test dumping the contents of a database into a file."
         db = self.server.create(self.settings["DATABASE"])
         id1 = "mydoc"

@@ -5,7 +5,7 @@ Most, but not all, features of this module work with CouchDB version < 2.0.
 Relies on 'requests': http://docs.python-requests.org/en/master/
 """
 
-__version__ = "1.9.6"
+__version__ = "1.10.0"
 
 # Standard packages
 import argparse
@@ -40,12 +40,12 @@ class Server(object):
                  username=None, password=None, use_session=True, ca_file=None):
         """Connect to the CouchDB server.
 
-        If `use_session` is true, then an authenticated CouchDB session
-        is used transparently.
-
-        Otherwise, username and password is sent with each request.
-
-        `ca_file` can point to a file or a directory containing CAs if
+        - `href` is the URL to the CouchDB server itself.
+        - `username` and `password` specify the CouchDB user account to use.
+        - If `use_session` is `True`, then an authenticated session is used
+        transparently. Otherwise, the values of `username` and `password` are
+        sent with each request.
+        - `ca_file` is a path to a file or a directory containing CAs if
         you need to access databases in HTTPS.
         """
         self.href = href.rstrip("/") + "/"
@@ -62,10 +62,16 @@ class Server(object):
 
     @property
     def version(self):
-        return self._GET().json()["version"]
+        "Return the version of the CouchDB server software."
+        try:
+            return self._version
+        except AttributeError:
+            self._version = self._GET().json()["version"]
+            return self._version
 
     @property
     def user_context(self):
+        "Return the user context of the connection."
         return self._GET("_session").json(object_pairs_hook=dict)
 
     def __str__(self):
@@ -97,33 +103,41 @@ class Server(object):
         return self._GET().json(object_pairs_hook=dict)
 
     def __del__(self):
-        "Clean up: Close the requests session."
+        "Clean up: Close the 'requests' session."
         self._session.close()
 
     def up(self):
         """Is the server up and running, ready to respond to requests?
         Returns a boolean.
 
-        CouchDB version >= 2.0.
+        CouchDB version >= 2.0
         """
         assert self.version >= "2.0"
         response = self._session.get(self.href + "_up")
         return response.status_code == 200
 
     def get(self, name, check=True):
-        "Get the named database."
+        """Get the named database. Returns an instance of class `Database`.
+
+        Raises `NotFoundError` if `check` is `True` and the database
+        does not exist.
+        """
         return Database(self, name, check=check)
 
-    def create(self, name, n=3, q=8):
-        "Create the named database."
-        return Database(self, name, n=n, q=q, check=False).create()
+    def create(self, name, n=3, q=8, partitioned=False):
+        """Create the named database. Raises `CreationError` if it
+        already exists.
+
+        - `name`: The name of the database.
+        - `n`: The number of replicas.
+        - `q`: The number of shards.
+        - `partitioned`: Whether to create a partitioned database.
+        """
+        db = Database(self, name, check=False)
+        return db.create(n=n, q=q, partitioned=partitioned)
 
     def get_config(self, nodename="_local"):
-        """Get the named node's configuration.
-
-        CouchDB version >= 2.0.
-        """
-        assert self.version >= "2.0"
+        "Get the named node's configuration."
         return self._GET("_node", nodename, "_config").json(object_pairs_hook=dict)
 
     def get_active_tasks(self):
@@ -133,7 +147,10 @@ class Server(object):
     def get_cluster_setup(self, ensure_dbs_exists=None):
         """Return the status of the node or cluster.
 
-        CouchDB version >= 2.0.
+        `ensure_dbs_exists` is a list system databases to ensure exist on the
+        node/cluster. Defaults to `["_users","_replicator"]`.
+
+        CouchDB version >= 2.0
         """
         assert self.version >= "2.0"
         if ensure_dbs_exists is None:
@@ -146,7 +163,9 @@ class Server(object):
         """Configure a node as a single node, as part of a cluster,
         or finalize a cluster.
 
-        CouchDB version >= 2.0.
+        See the CouchDB documentation for the contents of `doc`.
+
+        CouchDB version >= 2.0
         """
         assert self.version >= "2.0"
         self._POST("_cluster_setup", json=doc)
@@ -154,95 +173,83 @@ class Server(object):
     def get_membership(self):
         """Return data about the nodes that are part of the cluster.
 
-        CouchDB version >= 2.0.
+        CouchDB version >= 2.0
         """
         assert self.version >= "2.0"
         return self._GET("_membership").json(object_pairs_hook=dict)
 
-    def set_replicate(self, doc, is_transient=False):
-        "Request, configure, or stop, a replication operation."
-        if is_transient:
-            end_point = "_replicate"
-        else:
-            end_point = "_replicator"
-        return self._POST(end_point, json=doc)
+    def set_replicate(self, doc):
+        """Request, configure, or stop, a replication operation.
+
+        See the CouchDB documentation for the contents of `doc`.
+        """
+        return self._POST("_replicate", json=doc)
 
     def get_scheduler_jobs(self, limit=None, skip=None):
         """Get a list of replication jobs.
 
-        CouchDB version >= 2.0.
+        - 'limit': How many results to return.
+        - 'skip': How many result to skip starting at the beginning,
+          ordered by replication ID.
         """
-        assert self.version >= "2.0"
         params = {}
         if limit is not None:
-            params["limit"] = jsons(limit)
+            params["limit"] = _jsons(limit)
         if skip is not None:
-            params["skip"] = jsons(skip)
+            params["skip"] = _jsons(skip)
         return self._GET("_scheduler/jobs", params=params).json(object_pairs_hook=dict)
 
-    def get_scheduler_docs(self, limit=None, skip=None, replicator_db=None, docid=None):
+    def get_scheduler_docs(self, limit=None, skip=None):
         """Get information about replication document(s).
 
-        CouchDB version >= 2.0.
+        - 'limit': How many results to return.
+        - 'skip': How many result to skip starting at the beginning,
+          ordered by document ID.
         """
-        assert self.version >= "2.0"
         params = {}
         if limit is not None:
-            params["limit"] = jsons(limit)
+            params["limit"] = _jsons(limit)
         if skip is not None:
-            params["skip"] = jsons(skip)
-        args = ["_scheduler/docs"]
-        if replicator_db is not None:
-            args.append(replicator_db)
-            if docid is not None:
-                args.append(docid)
-        return self._GET(*args, params=params).json(object_pairs_hook=dict)
+            params["skip"] = _jsons(skip)
+        return self._GET("_scheduler/docs", params=params).json(object_pairs_hook=dict)
 
     def get_node_stats(self, nodename="_local"):
-        """"Return statistics for the running server.
-
-        CouchDB version >= 2.0.
-        """
-        assert self.version >= "2.0"
+        "Return statistics for the running server."
         return self._GET("_node", nodename, "_stats").json(object_pairs_hook=dict)
 
     def get_node_system(self, nodename="_local"):
-        """Return various system-level statistics for the running server.
-
-        CouchDB version >= 2.0.
-        """
-        assert self.version >= "2.0"
+        "Return various system-level statistics for the running server."
         return self._GET("_node", nodename, "_system").json(object_pairs_hook=dict)
 
     def _HEAD(self, *segments, **kwargs):
-        "HTTP HEAD request to the CouchDB server."
+        "HTTP HEAD request to the CouchDB server, and check the response."
         response = self._session.head(self._href(segments))
         self._check(response, errors=kwargs.get("errors", {}))
         return response
 
     def _GET(self, *segments, **kwargs):
-        "HTTP GET request to the CouchDB server."
+        "HTTP GET request to the CouchDB server, and check the response."
         kw = self._kwargs(kwargs, "headers", "params")
         response = self._session.get(self._href(segments), **kw)
         self._check(response, errors=kwargs.get("errors", {}))
         return response
 
     def _PUT(self, *segments, **kwargs):
-        "HTTP PUT request to the CouchDB server."
+        "HTTP PUT request to the CouchDB server, and check the response."
         kw = self._kwargs(kwargs, "json", "data", "headers")
         response = self._session.put(self._href(segments), **kw)
         self._check(response, errors=kwargs.get("errors", {}))
         return response
 
     def _POST(self, *segments, **kwargs):
-        "HTTP POST request to the CouchDB server."
+        "HTTP POST request to the CouchDB server, and check the response."
         kw = self._kwargs(kwargs, "json", "data", "headers", "params")
         response = self._session.post(self._href(segments), **kw)
         self._check(response, errors=kwargs.get("errors", {}))
         return response
 
     def _DELETE(self, *segments, **kwargs):
-        """HTTP DELETE request to the CouchDB server.
+        """HTTP DELETE request to the CouchDB server, and check the response.
         Pass parameters in the keyword argument 'params'.
         """
         kw = self._kwargs(kwargs, "headers")
@@ -280,11 +287,9 @@ class Server(object):
 class Database(object):
     "Interface to a named CouchDB database."
 
-    def __init__(self, server, name, n=3, q=2, check=True):
+    def __init__(self, server, name, check=True):
         self.server = server
         self.name = name
-        self.n = n
-        self.q = q
         if check:
             self.check()
 
@@ -297,7 +302,7 @@ class Database(object):
         return self.server._GET(self.name).json()["doc_count"]
 
     def __contains__(self, id):
-        "Does a document with the given id exist in the database?"
+        "Does a document with the given identifier exist in the database?"
         response = self.server._HEAD(self.name, id, errors={404: None})
         return response.status_code in (200, 304)
 
@@ -319,13 +324,19 @@ class Database(object):
         return response.status_code == 200
 
     def check(self):
-        "Raises NotFoundError if the database does not exist."
+        "Raises 'NotFoundError' if the database does not exist."
         if not self.exists():
             raise NotFoundError(f"Database '{self}' does not exist.")
 
-    def create(self):
-        "Create the database. Raises CreationError if it already exists."
-        self.server._PUT(self.name, data={"n": self.n, "q": self.q})
+    def create(self, n=3, q=8, partitioned=False):
+        """Create the database. Raises 'CreationError' if it already exists.
+
+        - `n`: The number of replicas.
+        - `q`: The number of shards.
+        - `partitioned`: Whether to create a partitioned database.
+        """
+        self.server._PUT(self.name,
+                         data={"n": n, "q": q, "partitioned": partitioned})
         return self
 
     def destroy(self):
@@ -341,16 +352,19 @@ class Database(object):
         return self.server._GET(self.name, "_security").json(object_pairs_hook=dict)
 
     def set_security(self, doc):
-        "Set the security information for the database."
+        """Set the security information for the database.
+
+        See the CouchDB documentation for the contents of `doc`.
+        """
         self.server._PUT(self.name, "_security", json=doc)
 
     def compact(self, finish=False, callback=None):
         """Compact the CouchDB database by rewriting the disk database file
         and removing old revisions of documents.
 
-        If `finish` is True, then return only when compaction is done.
-        In addition, if defined, the function `callback(seconds)` is called
-        every second until compaction is done.
+        - If `finish` is True, then return only when compaction is done.
+        - In addition, if defined, the function `callback(seconds)` is called
+          every second until compaction is done.
         """
         self.server._POST(self.name, "_compact",
                           headers={"Content-Type": JSON_MIME})
@@ -374,21 +388,25 @@ class Database(object):
         """
         self.server._POST(self.name, "_view_cleanup")
 
-    def get(self, id, rev=None, revs_info=False, default=None, conflicts=False):
-        """Return the document with the given id,
+    def get(self, id, default=None, rev=None, revs_info=False, conflicts=False):
+        """Return the document with the given identifier,
         or the `default` value if not found.
 
-        If conflicts is True, the returned document includes information
-        about conflicts in document (in `_conflicts` attribute).
+        - `rev`: Retrieves document of specified revision, if specified.
+        - `revs_info`: Whether to include detailed information for all known
+          document revisions.
+        - `conflicts`: Whether to include information about conflicts in
+          the document in the `_conflicts` attribute.
         """
         params = {}
         if rev is not None:
             params["rev"] = rev
         if revs_info:
-            params["revs_info"] = jsons(True)
+            params["revs_info"] = _jsons(True)
         if conflicts:
-            params['conflicts'] = jsons(True)
-        response = self.server._GET(self.name, id, errors={404: None},
+            params['conflicts'] = _jsons(True)
+        response = self.server._GET(self.name, id,
+                                    errors={404: None},
                                     params=params)
         if response.status_code == 404:
             return default
@@ -423,7 +441,7 @@ class Database(object):
         be present in the document, and it will be updated.
 
         If the document does not contain an item `_id`, it is added
-        with a IUID value. The `_rev` item is also added.
+        having a UUID4 hex value. The `_rev` item is also added.
         """
         if "_id" not in doc:
             doc["_id"] = uuid.uuid4().hex
@@ -436,8 +454,8 @@ class Database(object):
 
         Returns an iterable (list) over the resulting documents.
 
-        `docs`: a sequence of dictionaries or `Document` objects, or
-        objects providing a `items()` method that can be used to convert
+        `docs` is a sequence of dictionaries or `Document` objects, or
+        objects providing an `items()` method that can be used to convert
         them to a dictionary.
 
         The return value of this method is a list containing a tuple for every
@@ -505,7 +523,7 @@ class Database(object):
     def get_designs(self):
         """Return the design documents for the database.
 
-        CouchDB version >= 2.2.
+        **NOTE:** CouchDB version >= 2.2.
         """
         assert self.server.version >= "2.2"
         return self.server._GET(self.name, "_design_docs").json(object_pairs_hook=dict)
@@ -520,7 +538,8 @@ class Database(object):
         If the existing design document is identical, no action is taken and
         False is returned, else the document is updated and True is returned.
 
-        If `rebuild` is True, force view indexes to be rebuilt after update.
+        If `rebuild` is True, force view indexes to be rebuilt after update
+        by accessing the view. This may take some time.
 
         Example of doc:
         ```
@@ -557,45 +576,73 @@ class Database(object):
              skip=None, limit=None, sorted=True, descending=False,
              group=False, group_level=None, reduce=None, include_docs=False,
              update=None):
-        """Return a ViewResult object, containing the following attributes:
-        - `rows`: the list of Row objects.
+        """Return a ViewResult instance, containing the following attributes:
+
+        - `rows`: the list of Row instances.
         - `offset`: the offset used for the set of rows.
         - `total_rows`: the total number of rows selected.
 
         A Row object contains the following attributes:
+
         - `id`: the identifier of the document, if any.
         - `key`: the key for the index row.
         - `value`: the value for the index row.
         - `doc`: the document, if any.
 
-        If `include_docs` is True, then `reduce` is forced to False.
+        Keyword arguments:
+
+        - `key`: Return only rows that match the specified key.
+        - `keys`: Return only rows where they key matches one of
+          those specified as a list.
+        - `startkey`: Return rows starting with the specified key.
+        - `endkey`: Stop returning rows when the specified key is reached.
+        - `skip`: Skip the number of rows before starting to return rows.
+        - `limit`: Limit the number of rows returned.
+        - `sorted=True`: Sort the rows by the key of each returned row.
+          The items `total_rows` and `offset` are not available if 
+          set to `False`.
+        - `descending=False`: Return the rows in descending order.
+        - `group=False`: Group the results using the reduce function of
+          the design document to a group or a single row. If set to `True`
+          implies `reduce` to `True` and defaults the `group_level` 
+          to the maximum.
+        - `group_level`: Specify the group level to use. Implies `group`
+          is `True`.
+        - `reduce`: If set to `False` then do not use the reduce function 
+          if there is one defined in the design document. Default is to
+          use the reduce function if defined.
+        - `include_docs=False`: If `True`, include the document for each row.
+          This will force `reduce` to `False`.
+        - `update="true"`: Whether ir not the view should be updated prior to
+          returning the result. Supported value are `"true"`, `"false"`
+          and `"lazy"`.
         """
         params = {}
         if startkey is not None:
-            params["startkey"] = jsons(startkey)
+            params["startkey"] = _jsons(startkey)
         if key is not None:
-            params["key"] = jsons(key)
+            params["key"] = _jsons(key)
         if keys is not None:
-            params["keys"] = jsons(keys)
+            params["keys"] = _jsons(keys)
         if endkey is not None:
-            params["endkey"] = jsons(endkey)
+            params["endkey"] = _jsons(endkey)
         if skip is not None:
-            params["skip"] = jsons(skip)
+            params["skip"] = _jsons(skip)
         if limit is not None:
-            params["limit"] = jsons(limit)
+            params["limit"] = _jsons(limit)
         if not sorted:
-            params["sorted"] = jsons(False)
+            params["sorted"] = _jsons(False)
         if descending:
-            params["descending"] = jsons(True)
+            params["descending"] = _jsons(True)
         if group:
-            params["group"] = jsons(True)
+            params["group"] = _jsons(True)
         if group_level is not None:
-            params["group_level"] = jsons(group_level)
+            params["group_level"] = _jsons(group_level)
         if reduce is not None:
-            params["reduce"] = jsons(bool(reduce))
+            params["reduce"] = _jsons(bool(reduce))
         if include_docs:
-            params["include_docs"] = jsons(True)
-            params["reduce"] = jsons(False)
+            params["include_docs"] = _jsons(True)
+            params["reduce"] = _jsons(False)
         if update is not None:
             assert update in ["true","false","lazy"]
             params["update"] = update
@@ -610,7 +657,7 @@ class Database(object):
     def get_indexes(self):
         """Return a list of all indexes in the database.
 
-        CouchDB version >= 2.0.
+        CouchDB version >= 2.0
         """
         assert self.server.version >= "2.0"
         return self.server._GET(self.name, "_index").json(object_pairs_hook=dict)
@@ -626,7 +673,7 @@ class Database(object):
         Returns a dictionary with items `id` (design document identifier; sic!),
         `name` (index name) and `result` (`created` or `exists`).
 
-        CouchDB version >= 2.0.
+        CouchDB version >= 2.0
         """
         assert self.server.version >= "2.0"
         doc = {"index": {"fields": fields}}
@@ -641,25 +688,40 @@ class Database(object):
     def delete_index(ddoc, name):
         """Delete the named index.
 
-        CouchDB version >= 2.0.
+        CouchDB version >= 2.0
         """
         assert self.server.version >= "2.0"
         self.server._DELETE(self.name, "_index", ddoc, "json", name)
 
     def find(self, selector, limit=None, skip=None, sort=None, fields=None,
-             use_index=None, bookmark=None, update=None, conflicts=None):
-        """Select documents according to the selector.
+             use_index=None, bookmark=None, update=True, conflicts=False):
+        """Select documents according to the Mango index `selector`. 
+        For more information on selector syntax, see
+        https://docs.couchdb.org/en/latest/api/database/find.html#find-selectors
+
+        - `limit`: Maximum number of results returned.
+        - `skip`: Skip the given number of results.
+        - `sort`: A list of dictionaries specifying the order of the results,
+          where the field name is the key and the direction is the value;
+          either `"asc"` or `"desc"`.
+        - `fields`: List specifying which fields of each result document should
+          be returned. If omitted, return the entire document.
+        - `use_index`: String or list of strings specifying the index(es)
+          to use.
+        - `bookmark`: A string that marks the end the previous set of results.
+          If given, the next set of results will be returned.
+        - `update`: Whether to update the index prior to returning the result.
+        - `conflicts`: Whether to include conflicted documents.
 
         Returns a dictionary with items `docs`, `warning`, `execution_stats`
         and `bookmark`.
 
-        If conflicts is True, includes information about conflicts in documents
-        (in `_conflicts` attribute).
-
-        CouchDB version >= 2.0.
+        CouchDB version >= 2.0
         """
         assert self.server.version >= "2.0"
-        doc = {"selector": selector}
+        doc = {"selector": selector,
+               "update": bool(update),
+               "conflicts": bool(conflicts)}
         if limit is not None:
             doc["limit"] = limit
         if skip is not None:
@@ -672,20 +734,27 @@ class Database(object):
             doc["use_index"] = use_index
         if bookmark is not None:
             doc["bookmark"] = bookmark
-        if update is not None:
-            doc["update"] = update
-        if conflicts is not None:
-            doc['conflicts'] = conflicts
         return self.server._POST(self.name, "_find", json=doc).json(object_pairs_hook=dict)
 
     def explain(self, selector, limit=None, skip=None, sort=None, fields=None,
-                use_index=None, bookmark=None, update=None):
+                bookmark=None, update=False):
         """Return info on which index is being used by the query.
 
-        CouchDB version >= 2.0.
+        - `limit`: Maximum number of results returned.
+        - `skip`: Skip the given number of results.
+        - `sort`: A list of dictionaries specifying the order of the results,
+          where the field name is the key and the direction is the value;
+          either `"asc"` or `"desc"`.
+        - `fields`: List specifying which fields of each result document should
+          be returned. If omitted, return the entire document.
+        - `bookmark`: A string that marks the end the previous set of results.
+          If given, the next set of results will be returned.
+        - `update`: Whether to update the index prior to returning the result.
+
+        CouchDB version >= 2.0
         """
         assert self.server.version >= "2.0"
-        doc = {"selector": selector}
+        doc = {"selector": selector, "update": bool(update)}
         if limit is not None:
             doc["limit"] = limit
         if skip is not None:
@@ -694,12 +763,8 @@ class Database(object):
             doc["sort"] = sort
         if fields is not None:
             doc["fields"] = fields
-        if use_index is not None:
-            doc["use_index"] = use_index
         if bookmark is not None:
             doc["bookmark"] = bookmark
-        if update is not None:
-            doc["update"] = update
         return self.server._POST(self.name, "_explain", json=doc).json(object_pairs_hook=dict)
 
     def get_attachment(self, doc, filename):
@@ -709,13 +774,19 @@ class Database(object):
         return io.BytesIO(response.content)
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
-        """`content` is a string or a file-like object. Return the new
-        revision of the document.
+        """Add or update the given file as an attachment to the given document
+        in the database.
+
+        - `content` is a string or a file-like object.
+        - If `filename` is not provided, then an attempt is made to get it from
+          the `content` object. If this fails, `ValueError` is raised.
+        - If `content_type` is not provided, then an attempt to guess it from
+          the filename extension is made. If that does not work, it is
+          set to `"application/octet-stream"`
+
+        Returns the new revision of the document.
 
         NOTE: Since version 1.9.0, the `_rev` of the input `doc` is updated.
-
-        If `filename` is not provided, then an attempt is made to get it
-        from the content object.
         """
         if filename is None:
             try:
@@ -745,15 +816,16 @@ class Database(object):
         return doc["_rev"]
 
     def dump(self, filepath, callback=None):
-        """Dump the entire database to a tar file.
+        """Dump the entire database to a `tar` file.
+
+        Return a tuple `(ndocs, nfiles)` giving the number of documents
+        and attached files written out.
 
         If defined, the function `callback(ndocs, nfiles)` is called
         every 100 documents.
 
         If the filepath ends with `.gz`, then the tar file is gzip compressed.
-        The `_rev` item of each document is kept.
-
-        A tuple (ndocs, nfiles) is returned.
+        The `_rev` item of each document is written out.
         """
         ndocs = 0
         nfiles = 0
@@ -764,7 +836,7 @@ class Database(object):
         with tarfile.open(filepath, mode=mode) as outfile:
             for doc in self:
                 info = tarfile.TarInfo(doc["_id"])
-                data = jsons(doc).encode("utf-8")
+                data = _jsons(doc).encode("utf-8")
                 info.size = len(data)
                 outfile.addfile(info, io.BytesIO(data))
                 ndocs += 1
@@ -786,16 +858,18 @@ class Database(object):
         return (ndocs, nfiles)
 
     def undump(self, filepath, callback=None):
-        """Load the named tar file, which must have been produced by `dump`.
+        """Load the `tar` file given by the path. It must have been
+        produced by `db.dump`.
+
+        Return a tuple `(ndocs, nfiles)` giving the number of documents
+        and attached files read from the file.
 
         If defined, the function `callback(ndocs, nfiles)` is called
         every 100 documents.
 
         NOTE: The documents are just added to the database, ignoring any
         `_rev` items. This means that no document with the same identifier
-        must exist in the database.
-
-        A tuple (ndocs, nfiles) is returned.
+        may exist in the database.
         """
         ndocs = 0
         nfiles = 0
@@ -862,7 +936,9 @@ class _DatabaseIterator(object):
 
 
 class ViewResult(object):
-    "Result of view query; contains rows, offset, total_rows."
+    """Result of view query; contains rows, offset, total_rows.
+    Instances of this class are not supposed to be created by client software.
+    """
 
     def __init__(self, rows, offset, total_rows):
         self.rows = rows
@@ -883,7 +959,6 @@ class ViewResult(object):
         result = dict()
         result["total_rows"] = self.total_rows
         result["offset"] = self.offset
-        result["rows"] = [r._asdict() for r in self]
         return result
 
 
@@ -936,12 +1011,12 @@ _ERRORS = {200: None,
            500: ServerError}
 
 
-def jsons(data, indent=None):
+def _jsons(data, indent=None):
     "Convert data into JSON string."
     return json.dumps(data, ensure_ascii=False, indent=indent)
 
 
-def get_parser():
+def _get_parser():
     "Get the parser for the command line tool."
     p = argparse.ArgumentParser(prog="couchdb2", usage="%(prog)s [options]",
                                 description="CouchDB v2.x command line tool,"
@@ -1102,7 +1177,7 @@ def get_settings(pargs):
             s["PASSWORD"] = None
         else:
             s["PASSWORD"] = "***"
-        print("Settings:", jsons(s, indent=2))
+        print("Settings:", _jsons(s, indent=2))
     return settings
 
 
@@ -1171,7 +1246,7 @@ def _json_output(pargs, data, else_print=False):
                 outfile.write(unicode(js))
         _verbose(pargs, "Wrote JSON to file", pargs.output)
     elif else_print:
-        print(jsons(data, indent=2))
+        print(_jsons(data, indent=2))
     return bool(pargs.output)
 
 def json_input(filepath):
@@ -1194,7 +1269,7 @@ def _execute(pargs, settings):
                     password=settings["PASSWORD"],
                     ca_file=pargs.ca_file)
     if pargs.verbose and server.user_context:
-        print("User context:", jsons(server.user_context, indent=2))
+        print("User context:", _jsons(server.user_context, indent=2))
     if pargs.version:
         if not _json_output(pargs, server.version):
             print(server.version)
@@ -1346,7 +1421,7 @@ def _execute(pargs, settings):
 def main():
     "Entry point for the CouchDB2 command line tool."
     try:
-        parser = get_parser()
+        parser = _get_parser()
         pargs = parser.parse_args()
         if len(sys.argv) == 1:
             parser.print_usage()
