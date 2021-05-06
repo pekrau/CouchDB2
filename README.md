@@ -49,12 +49,12 @@ db.destroy()
 ## News
 
 - 1.10.0
-  - Changed to unittest for the test script. Added some tests.
-  - Got rid of package `pytest`.
+  - Changed to unittest for the test script. Got rid of package `pytest`.
+    Added some tests.
   - Improved the documentation in source and README.
   - Fixed setup.py.
   - Added `__del__` to Server class.
-  - Simplified 'get_scheduler_docs'.
+  - Simplified `get_scheduler_docs`.
   - Hide module-level functions which are just help functions for the
     command-line tool.
   - Removed `CouchDB version >= 2.0` from some methods incorrectly
@@ -81,7 +81,7 @@ db.destroy()
 - 1.8.4
   - Added `get_bulk(ids)`: Get several documents in one operation.
 
-## class Server
+## `class Server`
 ```python
 server = Server(href="http://localhost:5984/",
                 username=None, password=None,
@@ -97,11 +97,11 @@ An instance of the class is a connection to the CouchDB server.
 - `ca_file` is a path to a file or a directory containing CAs if
   you need to access databases in HTTPS.
 
-### server.version
+### `server.version`
 
 Property attribute providing the version of the CouchDB server software.
 
-### server.user_context
+### `server.user_context`
 
 Property attribute providing the user context of the connection.
 
@@ -212,16 +212,16 @@ See the CouchDB documentation for the contents of `doc`.
 
 Get a list of replication jobs.
 
-- 'limit': How many results to return.
-- 'skip': How many result to skip starting at the beginning,
+- `limit`: How many results to return.
+- `skip`: How many result to skip starting at the beginning,
   ordered by replication ID.
 
 ### `server.get_scheduler_docs(limit=None, skip=None)`
 
 Get information about replication document states.
 
-- 'limit': How many results to return.
-- 'skip': How many result to skip starting at the beginning,
+- `limit`: How many results to return.
+- `skip`: How many result to skip starting at the beginning,
   ordered by document ID.
 
 ### `server.get_node_stats(nodename="_local")`
@@ -435,8 +435,8 @@ More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
 
 ### `db.view(designname, viewname, **kwargs)`
 
-Return a [ViewResult](#viewresult) instance, containing
-the following attributes:
+Return an instance of [class ViewResult](#class-viewresultrows-offset-total_rows),
+containing the following attributes:
 
 - `rows`: The list of `Row` objects.
 - `offset`: The offset used for the set of rows.
