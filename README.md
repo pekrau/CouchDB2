@@ -53,16 +53,16 @@ db.destroy()
   - Got rid of package `pytest`.
   - Improved the documentation in source and README.
   - Fixed setup.py.
-  - Added \_\_del\_\_ to Server class.
+  - Added `__del__` to Server class.
   - Simplified 'get_scheduler_docs'.
   - Hide module-level functions which are just help functions for the
     command-line tool.
   - Removed `CouchDB version >= 2.0` from some methods incorrectly
     marked as such.
-  - Changed signatures of class Database methods `\_\_init\_\_`, `create`,
+  - Changed signatures of class Database methods `__init__`, `create`,
     `find` and `explain`.
 - 1.9.5
-  - Added \_\_str\_\_ to Server class.
+  - Added `__str__` to Server class.
 - 1.9.4
   - Added `update` parameter on views; thanks to https://github.com/rbarreiro
   - Added `n` and `q` parameters when creating a database; thanks to
@@ -105,7 +105,7 @@ Property attribute providing the version of the CouchDB server software.
 
 Property attribute providing the user context of the connection.
 
-### \_\_str\_\_
+### `__str__`
 ```python
 str(server)
 ```
