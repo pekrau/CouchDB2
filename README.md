@@ -111,57 +111,57 @@ str(server)
 ```
 Return a simple string representation of the server interface.
 
-### \_\_len\_\_
+### `__len__`
 ```python
 len(server)
 ```
 Return the number of user-defined databases.
 
-### \_\_iter\_\_
+### `__iter__`
 ```python
 for db in server: ...
 ```
 Return an iterator over all user-defined databases on the server.
 
-### \_\_getitem\_\_
+### `__getitem__`
 ```python
 db = server[name]
 ```
 Get the named database.
 
-### \_\_contains\_\_
+### `__contains__`
 ```python
 if name in server: ...
 ```
 Does the named database exist?
 
-### \_\_call\_\_
+### `__call__`
 ```python
 data = server()
 ```
 Return meta information about the server.
 
-### \_\_del\_\_
+### `__del__`
 
 Closes the `requests` session.
 
 Not for explicit use; it is automatically called when the Python
 garbage collection mechanism deletes the instance.
 
-### server.up()
+### `server.up()`
 
 Is the server up and running, ready to respond to requests?
 Returns a boolean.
 
 *CouchDB version >= 2.0*
 
-### server.get(name, check=True)
+### `server.get(name, check=True)`
 
 Get the named database. Returns an instance of class `Database`.
 
 Raises `NotFoundError` if `check` is `True` and the database does not exist.
 
-### server.create(name, n=3, q=8, partitioned=False)
+### `server.create(name, n=3, q=8, partitioned=False)`
 
 Create the named database. Raises `CreationError` if it already exists.
 
@@ -170,15 +170,15 @@ Create the named database. Raises `CreationError` if it already exists.
 - `q`: The number of shards.
 - `partitioned`: Whether to create a partitioned database.
 
-### server.get_config(nodename="_local")
+### `server.get_config(nodename="_local")`
 
 Get the named node's configuration.
 
-### server.get_active_tasks()
+### `server.get_active_tasks()`
 
 Return a list of running tasks.
 
-### server.get_cluster_setup(ensure_dbs_exists=None):
+### `server.get_cluster_setup(ensure_dbs_exists=None)`
 
 Return the status of the node or cluster.
 
@@ -187,7 +187,7 @@ node/cluster. Defaults to `["_users","_replicator"]`.
 
 *CouchDB version >= 2.0*
 
-### server.set_cluster_setup(doc)
+### `server.set_cluster_setup(doc)`
 
 Configure a node as a single node, as part of a cluster, or finalise a
 cluster.
@@ -196,19 +196,19 @@ See the CouchDB documentation for the contents of `doc`.
 
 *CouchDB version >= 2.0*
 
-### server.get_membership()
+### `server.get_membership()`
 
 Return data about the nodes that are part of the cluster.
 
 *CouchDB version >= 2.0*
 
-### server.set_replicate(doc)
+### `server.set_replicate(doc)`
 
 Request, configure, or stop, a replication operation.
 
 See the CouchDB documentation for the contents of `doc`.
 
-### server.get_scheduler_jobs(limit=None, skip=None)
+### `server.get_scheduler_jobs(limit=None, skip=None)`
 
 Get a list of replication jobs.
 
@@ -216,7 +216,7 @@ Get a list of replication jobs.
 - 'skip': How many result to skip starting at the beginning,
   ordered by replication ID.
 
-### server.get_scheduler_docs(limit=None, skip=None)
+### `server.get_scheduler_docs(limit=None, skip=None)`
 
 Get information about replication document states.
 
@@ -224,15 +224,15 @@ Get information about replication document states.
 - 'skip': How many result to skip starting at the beginning,
   ordered by document ID.
 
-### server.get_node_stats(nodename="_local")
+### `server.get_node_stats(nodename="_local")`
 
 Return statistics for the running server.
 
-### server.get_node_system(nodename="_local")
+### `server.get_node_system(nodename="_local")`
 
 Return various system-level statistics for the running server.
 
-## class Database
+## `class Database`
 ```python
 db = Database(server, name, n=3, q=8, check=True)
 ```
@@ -244,45 +244,45 @@ An instance of the class is an interface to a CouchDB database.
 - If `check` is `True`, then raise `NotFoundError` if the the database
   does not exist.
 
-### \_\_str\_\_
+### `__str__`
 ```python
 str(db)
 ```
 Return the name of the CouchDB database.
 
-### \_\_len\_\_
+### `__len__`
 ```python
 len(db)
 ```
 Return the number of documents in the database.
 
-### \_\_contains\_\_
+### `__contains__`
 ```python
 if identifier in db: ...
 ```
 Does a document with the given identifier exist in the database?
 
-### \_\_iter\_\_
+### `__iter__`
 ```python
 for doc in db: ...
 ```
 Return an iterator over all documents in the database.
 
-### \_\_getitem\_\_
+### `__getitem__`
 ```python
 doc = db[id]
 ```
 Return the document with the given id.
 
-### db.exists()
+### `db.exists()`
 
 Does the database exist? Returns a boolean.
 
-### db.check()
+### `db.check()`
 
 Raises `NotFoundError` if the database does not exist.
 
-### db.create(n=3, q=8, partitioned=False)
+### `db.create(n=3, q=8, partitioned=False)`
 
 Create the database. Raises `CreationError` if it already exists.
 
@@ -290,25 +290,25 @@ Create the database. Raises `CreationError` if it already exists.
 - `q`: The number of shards.
 - `partitioned`: Whether to create a partitioned database.
 
-### db.destroy()
+### `db.destroy()`
 
 Delete the database and all its contents.
 
-### db.get_info()
+### `db.get_info()`
 
 Return a dictionary with information about the database.
 
-### db.get_security()
+### `db.get_security()`
 
 Return a dictionary with security information for the database.
 
-### db.set_security(doc)
+### `db.set_security(doc)`
 
 Set the security information for the database.
 
 See the CouchDB documentation for the contents of `doc`.
 
-### db.compact(finish=False, callback=None)
+### `db.compact(finish=False, callback=None)`
 
 Compact the CouchDB database by rewriting the disk database file
 and removing old revisions of documents.
@@ -317,16 +317,16 @@ and removing old revisions of documents.
 - In addition, if defined, the function `callback(seconds)` is called
   every second until compaction is done.
 
-### db.compact_design(designname)
+### `db.compact_design(designname)`
 
 Compact the view indexes associated with the named design document.
 
-### db.view_cleanup()
+### `db.view_cleanup()`
 
 Remove unnecessary view index files due to changed views in
 design documents of the database.
 
-### db.get(id, default=None, rev=None, revs_info=False, conflicts=False)
+### `db.get(id, default=None, rev=None, revs_info=False, conflicts=False)`
 
 Return the document with the given identifier, or the `default` value
 if not found.
@@ -337,7 +337,7 @@ if not found.
 - `conflicts`: Whether to include information about conflicts in
   the document in the `_conflicts` attribute.
 
-### db.get_bulk(ids)
+### `db.get_bulk(ids)`
 
 Get several documents in one operation, given a list of document identifiers,
 each of which is a string (the document `_id`), or a tuple of the
@@ -346,14 +346,14 @@ document `(_id, _rev)`.
 Returns a list of documents. If no document is found for a specified
 `_id` or `(_id, _rev`), `None` is returned in that slot of the list.
 
-### db.ids()
+### `db.ids()`
 ```python
 for identifier in db.ids(): ...
 ```
 
 Returns an iterator over all document identifiers.
 
-### db.put(doc)
+### `db.put(doc)`
 
 Insert or update the document.
 
@@ -363,7 +363,7 @@ be present in the document; its value will be updated.
 If the document does not contain an item `_id`, it is added
 having a UUID4 hex value. The `_rev` item will also be added.
 
-### db.update(docs)
+### `db.update(docs)`
 
 Perform a bulk update or insertion of the given documents using a
 single HTTP request.
@@ -385,11 +385,11 @@ If an object in the documents list is not a dictionary, this method
 looks for an `items()` method that can be used to convert the object
 to a dictionary.
                   
-### db.delete(doc)
+### `db.delete(doc)`
 
 Delete the document, which must contain the `_id` and `_rev` items.
 
-### db.purge(docs)
+### `db.purge(docs)`
 
 Perform purging (complete removal) of the given list of documents.
 
@@ -397,17 +397,17 @@ Uses a single HTTP request to purge all given documents. Purged
 documents do not leave any meta-data in the storage and are not
 replicated.
 
-### db.get_designs()
+### `db.get_designs()`
 
 Return the design documents for the database.
 
-**NOTE:** *CouchDB version >= 2.0*
+**NOTE:** *CouchDB version >= 2.2*
 
-### db.get_design(designname)
+### `db.get_design(designname)`
 
 Get the named design document.
 
-### db.put_design(designname, doc, rebuild=True)
+### `db.put_design(designname, doc, rebuild=True)`
 
 Insert or update the design document under the given name.
 
@@ -433,7 +433,7 @@ Example of doc:
 
 More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
 
-### db.view(designname, viewname, **kwargs)
+### `db.view(designname, viewname, **kwargs)`
 
 Return a [ViewResult](#viewresult) instance, containing
 the following attributes:
@@ -472,13 +472,13 @@ Keyword arguments (default value is `None` unless specified):
 - `update="true"`: Whether ir not the view should be updated prior to
   returning the result. Supported value are `"true"`, `"false"` and `"lazy"`.
 
-### db.get_indexes()
+### `db.get_indexes()`
 
 Return a list of all Mango indexes in the database.
 
 *CouchDB version >= 2.0*
 
-### db.put_index(fields, ddoc=None, name=None, selector=None)
+### `db.put_index(fields, ddoc=None, name=None, selector=None)`
 
 Store a Mango index specification.
 
@@ -492,7 +492,7 @@ Returns a dictionary with items `id` (design document name; sic!),
 
 *CouchDB version >= 2.0*
 
-### db.find(selector, **kwargs)
+### `db.find(selector, **kwargs)`
 ```python
 data = db.find(selector, limit=25, skip=None, sort=None, fields=None,
                use_index=None, bookmark=None, update=True, conflicts=False)
@@ -518,20 +518,20 @@ and `bookmark`.
 
 *CouchDB version >= 2.0*
 
-### db.explain(selector, **kwargs)
+### `db.explain(selector, **kwargs)`
 ```python
 data = db.explain(selector, use_index=None, limit=None, skip=None, sort=None,
                   fields=None, bookmark=None, update=None)
 ```
-Return info on which index is being used by the query.
+Returns info on which index is being used by the query.
 
 *CouchDB version >= 2.0*
 
-### db.get_attachment(doc, filename)
+### `db.get_attachment(doc, filename)`
 
-Return a file-like object containing the content of the specified attachment.
+Returns a file-like object containing the content of the specified attachment.
 
-### db.put_attachment(doc, content, filename=None, content_type=None)
+### `db.put_attachment(doc, content, filename=None, content_type=None)`
 
 Add or update the given file as an attachment to the given document
 in the database.
@@ -548,14 +548,14 @@ Returns the new revision of the document.
 **NOTE**: Since version 1.9.0, the `_rev` item in the input `doc`
 **is** updated.
 
-### db.delete_attachment(doc, filename)
+### `db.delete_attachment(doc, filename)`
 
 Delete the attachment. Return the new revision of the document.
 
 **NOTE**: Since version 1.9.0, the `_rev` item in the input `doc`
 **is** updated.
 
-### db.dump(filepath, callback=None)
+### `db.dump(filepath, callback=None)`
 
 Dump the entire database to a `tar` file.
 
@@ -568,7 +568,7 @@ every 100 documents.
 If the filepath ends with `.gz`, then the tar file is gzip compressed.
 The `_rev` item of each document is written out.
 
-### db.undump(filepath, callback=None)
+### `db.undump(filepath, callback=None)`
 
 Load the `tar` file given by the path. It must have been produced by `db.dump`.
 
@@ -582,39 +582,39 @@ every 100 documents.
 `_rev` items. This means that no document with the same identifier
 may exist in the database.
 
-## CouchDB2Exception
+## `CouchDB2Exception`
 
 The Base CouchDB2 exception, from which all others derive.
 
-## NotFoundError
+## `NotFoundError`
 
 No such entity (e.g. database or document) exists.
 
-## BadRequestError
+## `BadRequestError`
 
 Invalid request; bad name, body or headers.
 
-## CreationError
+## `CreationError`
 
 Could not create the entity; it exists already.
 
-## RevisionError
+## `RevisionError`
 
 Wrong or missing `_rev` item in the document to save.
 
-## AuthorizationError
+## `AuthorizationError`
 
 Current user not authorized to perform the operation.
 
-## ContentTypeError
+## `ContentTypeError`
 
 Bad `Content-Type` value in the request.
 
-## ServerError
+## `ServerError`
 
 Internal CouchDB server error.
 
-## class ViewResult(rows, offset, total_rows)
+## `class ViewResult(rows, offset, total_rows)`
 
 An instance of this class is returned as result from `db.view()`.
 Instances of this class are not supposed to be created by client software.
@@ -625,29 +625,29 @@ Attributes:
 - `offset`: the offset used for the set of rows.
 - `total_rows`: the total number of rows selected.
 
-### \_\_len\_\_
+### `__len__`
 ```python
 len(viewresult)
 ```
 Return the number of rows in the view result.
 
-### \_\_iter\_\_
+### `__iter__`
 ```python
 for row in viewresult: ...
 ```
 Return an iterator over all rows in the view result.
 
-### \_\_getitem\_\_
+### `__getitem__`
 ```python
 row = viewresult[i]
 ```
 Return the indexed view result row.
 
-### json()
+### `vr.json()`
 
 Return the view result data in a JSON-like representation.
 
-## class Row(id, key, value, doc)
+## `class Row(id, key, value, doc)`
 
 Named-tuple object returned in ViewResult list attribute `rows`.
 
@@ -660,7 +660,7 @@ Attributes:
 
 ## Utility functions at the module level
 
-### read_settings(filepath, settings=None)
+### `read_settings(filepath, settings=None)`
 
 Read the settings lookup from a JSON format file.
 
@@ -692,7 +692,7 @@ each in the order given and if it exists:
 
 ### Options
 
-To print available command options:
+To show available command options:
 
 ```
 $ couchdb2 -h

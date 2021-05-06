@@ -1136,7 +1136,7 @@ def _get_parser():
     return p
 
 
-def get_settings(pargs):
+def _get_settings(pargs):
     """Get the settings lookup for the command line tool.
     1) Initialize with DEFAULT_SETTINGS
     2) Update with values in JSON file in DEFAULT_SETTINGS_FILEPATHS, if any.
@@ -1425,7 +1425,7 @@ def main():
         pargs = parser.parse_args()
         if len(sys.argv) == 1:
             parser.print_usage()
-        settings = get_settings(pargs)
+        settings = _get_settings(pargs)
         if pargs.password_question:
             settings["PASSWORD"] = getpass.getpass("password > ")
         _execute(pargs, settings)
