@@ -55,7 +55,7 @@ db.destroy()
   - Fixed setup.py.
   - Added `__del__` to Server class.
   - Simplified `get_scheduler_docs`.
-  - Hide module-level functions which are just help functions for the
+  - Hid module-level functions which are just help functions for the
     command-line tool.
   - Removed `CouchDB version >= 2.0` from some methods incorrectly
     marked as such.
@@ -505,9 +505,10 @@ Deletes the named index in the design document of the given name.
 data = db.find(selector, limit=25, skip=None, sort=None, fields=None,
                use_index=None, bookmark=None, update=True, conflicts=False)
 ```
-Selects documents according to the Mango index `selector`. For more information
-on selector syntax, see https://docs.couchdb.org/en/latest/api/database/find.html#find-selectors
+Selects documents according to the Mango index `selector`.
 
+- `selector`: The Mango index. For more information on selector syntax,
+   see https://docs.couchdb.org/en/latest/api/database/find.html#find-selectors
 - `limit`: Maximum number of results returned.
 - `skip`: Skip the given number of results.
 - `sort`: A list of dictionaries specifying the order of the results,
@@ -533,6 +534,8 @@ data = db.explain(selector, use_index=None, limit=None, skip=None,
 ```
 Returns info on which index is being used by the query.
 
+- `selector`: The Mango index. For more information on selector syntax,
+   see https://docs.couchdb.org/en/latest/api/database/find.html#find-selectors
 - `limit`: Maximum number of results returned.
 - `skip`: Skip the given number of results.
 - `sort`: A list of dictionaries specifying the order of the results,

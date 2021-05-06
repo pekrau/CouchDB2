@@ -697,10 +697,10 @@ class Database(object):
 
     def find(self, selector, limit=None, skip=None, sort=None, fields=None,
              use_index=None, bookmark=None, update=True, conflicts=False):
-        """Select documents according to the Mango index `selector`. 
-        For more information on selector syntax, see
-        https://docs.couchdb.org/en/latest/api/database/find.html#find-selectors
+        """Selects documents according to the Mango index `selector`.
 
+        - `selector`: The Mango index. For more information on selector syntax,
+          see https://docs.couchdb.org/en/latest/api/database/find.html#find-selectors
         - `limit`: Maximum number of results returned.
         - `skip`: Skip the given number of results.
         - `sort`: A list of dictionaries specifying the order of the results,
@@ -742,6 +742,8 @@ class Database(object):
                 sort=None, fields=None, bookmark=None):
         """Return info on which index is being used by the query.
 
+        - `selector`: The Mango index. For more information on selector syntax,
+          see https://docs.couchdb.org/en/latest/api/database/find.html#find-selectors
         - `limit`: Maximum number of results returned.
         - `skip`: Skip the given number of results.
         - `sort`: A list of dictionaries specifying the order of the results,
