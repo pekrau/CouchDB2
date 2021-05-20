@@ -5,7 +5,7 @@ Most, but not all, features of this module work with CouchDB version < 2.0.
 Relies on 'requests': http://docs.python-requests.org/en/master/
 """
 
-__version__ = "1.10.0"
+__version__ = "1.11.0"
 
 # Standard packages
 import argparse
@@ -33,7 +33,7 @@ BIN_MIME = "application/octet-stream"
 CHUNK_SIZE = 100
 
 
-class Server(object):
+class Server:
     "An instance of the class is a connection to the CouchDB server."
 
     def __init__(self, href="http://localhost:5984/",
@@ -72,7 +72,8 @@ class Server(object):
     @property
     def user_context(self):
         "Returns the user context of the connection."
-        return self._GET("_session").json(object_pairs_hook=dict)
+        response = self._GET("_session")
+        return response.json()
 
     def __str__(self):
         "Returns a simple string representation of the server interface."
@@ -100,7 +101,8 @@ class Server(object):
 
     def __call__(self):
         "Returns meta information about the instance."
-        return self._GET().json(object_pairs_hook=dict)
+        response = self._GET()
+        return response.json()
 
     def __del__(self):
         "Clean-up: Close the 'requests' session."
@@ -138,11 +140,13 @@ class Server(object):
 
     def get_config(self, nodename="_local"):
         "Gets the named node's configuration."
-        return self._GET("_node", nodename, "_config").json(object_pairs_hook=dict)
+        response = self._GET("_node", nodename, "_config")
+        return response.json()
 
     def get_active_tasks(self):
         "Returns a list of running tasks."
-        return self._GET("_active_tasks").json(object_pairs_hook=dict)
+        response = self._GET("_active_tasks")
+        return response.json()
 
     def get_cluster_setup(self, ensure_dbs_exists=None):
         """Returns the status of the node or cluster.
@@ -157,7 +161,8 @@ class Server(object):
             params = {}
         else:
             params = {"ensure_dbs_exists": ensure_dbs_exists}
-        return self._GET("_cluster_setup", params=params).json(object_pairs_hook=dict)
+        response = self._GET("_cluster_setup", params=params)
+        return response.json()
 
     def set_cluster_setup(self, doc):
         """Configures a node as a single node, as part of a cluster,
@@ -176,14 +181,16 @@ class Server(object):
         CouchDB version >= 2.0
         """
         assert self.version >= "2.0"
-        return self._GET("_membership").json(object_pairs_hook=dict)
+        response = self._GET("_membership")
+        return response.json()
 
     def set_replicate(self, doc):
         """Request, configure, or stop, a replication operation.
 
         See the CouchDB documentation for the contents of `doc`.
         """
-        return self._POST("_replicate", json=doc)
+        response = self._POST("_replicate", json=doc)
+        return response.json()
 
     def get_scheduler_jobs(self, limit=None, skip=None):
         """Gets a list of replication jobs.
@@ -197,7 +204,8 @@ class Server(object):
             params["limit"] = _jsons(limit)
         if skip is not None:
             params["skip"] = _jsons(skip)
-        return self._GET("_scheduler/jobs", params=params).json(object_pairs_hook=dict)
+        response = self._GET("_scheduler/jobs", params=params)
+        return response.json()
 
     def get_scheduler_docs(self, limit=None, skip=None):
         """Gets information about replication document(s).
@@ -211,15 +219,18 @@ class Server(object):
             params["limit"] = _jsons(limit)
         if skip is not None:
             params["skip"] = _jsons(skip)
-        return self._GET("_scheduler/docs", params=params).json(object_pairs_hook=dict)
+        response = self._GET("_scheduler/docs", params=params)
+        return response.json()
 
     def get_node_stats(self, nodename="_local"):
         "Returns statistics for the running server."
-        return self._GET("_node", nodename, "_stats").json(object_pairs_hook=dict)
+        response = self._GET("_node", nodename, "_stats")
+        return response.json()
 
     def get_node_system(self, nodename="_local"):
         "Returns various system-level statistics for the running server."
-        return self._GET("_node", nodename, "_system").json(object_pairs_hook=dict)
+        response = self._GET("_node", nodename, "_system")
+        return response.json()
 
     def _HEAD(self, *segments, **kwargs):
         "HTTP HEAD request to the CouchDB server, and check the response."
@@ -284,7 +295,7 @@ class Server(object):
             raise error(response.reason)
 
 
-class Database(object):
+class Database:
     "An instance of the class is an interface to a CouchDB database."
 
     def __init__(self, server, name, check=True):
@@ -345,11 +356,13 @@ class Database(object):
 
     def get_info(self):
         "Returns a dictionary with information about the database."
-        return self.server._GET(self.name).json(object_pairs_hook=dict)
+        response = self.server._GET(self.name)
+        return response.json()
 
     def get_security(self):
         "Returns a dictionary with security information for the database."
-        return self.server._GET(self.name, "_security").json(object_pairs_hook=dict)
+        response = self.server._GET(self.name, "_security")
+        return response.json()
 
     def set_security(self, doc):
         """Sets the security information for the database.
@@ -410,7 +423,7 @@ class Database(object):
                                     params=params)
         if response.status_code == 404:
             return default
-        return response.json(object_pairs_hook=dict)
+        return response.json()
 
     def get_bulk(self, ids):
         """Gets several documents in one operation, given a list of
@@ -478,12 +491,13 @@ class Database(object):
             else:
                 raise TypeError("expected dict, got %s" % type(doc))
 
-        data = self.server._POST(self.name + "/_bulk_docs",
+        response = self.server._POST(self.name + "/_bulk_docs",
                                  data=json.dumps({"docs": documents}),
-                                 headers={"Content-Type": "application/json"})
+                                 headers={"Content-Type": JSON_MIME})
 
+        data = response.json()
         results = []
-        for result in data.json():
+        for result in data:
             if "error" in result:
                 results.append((False, result["id"], result["error"], result["reason"]))
             else:
@@ -515,10 +529,10 @@ class Database(object):
                 content[doc["_id"]] = [doc["_rev"]]
             else:
                 raise TypeError("expected dict, got %s" % type(doc))
-        data = self.server._POST(self.name + "/_purge",
-                                 data=json.dumps(content),
-                                 headers={"Content-Type": "application/json"})
-        return data.json()
+        response = self.server._POST(self.name + "/_purge",
+                                     data=json.dumps(content),
+                                     headers={"Content-Type": JSON_MIME})
+        return response.json()
 
     def get_designs(self):
         """Returns the design documents for the database.
@@ -526,11 +540,13 @@ class Database(object):
         **NOTE:** CouchDB version >= 2.2.
         """
         assert self.server.version >= "2.2"
-        return self.server._GET(self.name, "_design_docs").json(object_pairs_hook=dict)
+        response = self.server._GET(self.name, "_design_docs")
+        return response.json()
 
     def get_design(self, designname):
         "Gets the named design document."
-        return self.server._GET(self.name, "_design", designname).json(object_pairs_hook=dict)
+        response = self.server._GET(self.name, "_design", designname)
+        return response.json()
 
     def put_design(self, designname, doc, rebuild=True):
         """Inserts or updates the design document under the given name.
@@ -560,7 +576,7 @@ class Database(object):
         response = self.server._GET(self.name, "_design", designname,
                                     errors={404: None})
         if response.status_code == 200:
-            current_doc = response.json(object_pairs_hook=dict)
+            current_doc = response.json()
             doc["_id"] = current_doc["_id"]
             doc["_rev"] = current_doc["_rev"]
             if doc == current_doc:
@@ -662,7 +678,8 @@ class Database(object):
         CouchDB version >= 2.0
         """
         assert self.server.version >= "2.0"
-        return self.server._GET(self.name, "_index").json(object_pairs_hook=dict)
+        response = self.server._GET(self.name, "_index")
+        return response.json()
 
     def put_index(self, fields, ddoc=None, name=None, selector=None):
         """Stores a Mango index specification.
@@ -685,7 +702,8 @@ class Database(object):
             doc["name"] = name
         if selector is not None:
             doc["index"]["partial_filter_selector"] = selector
-        return self.server._POST(self.name, "_index", json=doc).json(object_pairs_hook=dict)
+        response = self.server._POST(self.name, "_index", json=doc)
+        return response.json()
 
     def delete_index(designname, name):
         """Deletes the named index in the design document of the given name.
@@ -736,7 +754,8 @@ class Database(object):
             doc["use_index"] = use_index
         if bookmark is not None:
             doc["bookmark"] = bookmark
-        return self.server._POST(self.name, "_find", json=doc).json(object_pairs_hook=dict)
+        response = self.server._POST(self.name, "_find", json=doc)
+        return response.json()
 
     def explain(self, selector, limit=None, skip=None, 
                 sort=None, fields=None, bookmark=None):
@@ -768,7 +787,8 @@ class Database(object):
             doc["fields"] = fields
         if bookmark is not None:
             doc["bookmark"] = bookmark
-        return self.server._POST(self.name, "_explain", json=doc).json(object_pairs_hook=dict)
+        response = self.server._POST(self.name, "_explain", json=doc)
+        return response.json()
 
     def get_attachment(self, doc, filename):
         "Returns a file-like object containing the content of the attachment."
@@ -818,6 +838,59 @@ class Database(object):
         # Return the new `_rev` for backwards compatibility reasons.
         return doc["_rev"]
 
+    def changes(self, doc_ids=None, conflicts=None, descending=None,
+                feed="normal", filter=None, heartbeat=None, include_docs=None,
+                attachments=None, att_encoding_info=None, last_event_id=None,
+                limit=None, since=None, style=None, timeout=None, view=None,
+                seq_interval=None):
+        """Returns a sorted list of changes made to documents in the database,
+        in time order of application.
+
+        Refer to the CouchDB documentation
+        https://docs.couchdb.org/en/stable/api/database/changes.html
+
+        NOTE: This implementation has not been adequately tested.
+        In particular, the behaviour with a 'feed' value other than
+        the default 'normal' is unknown.
+        """
+        params = {}
+        data = None
+        if doc_ids is not None:
+            params["filter"] = "_doc_ids"
+            data = dict(doc_ids=doc_ids)
+        if conflicts is not None:
+            params["conflicts"] = _jsons(conflicts)
+        if feed is not None:
+            params["feed"] = feed
+        if filter is not None:
+            params["filter"] = filter
+        if heartbeat is not None:
+            params["heartbeat"] = _jsons(heartbeat)
+        if include_docs is not None:
+            params["include_docs"] = _jsons(include_docs)
+        if attachments is not None:
+            params["attachments"] = _jsons(attachments)
+        if att_encoding_info is not None:
+            params["att_encoding_info"] = _jsons(att_encoding_info)
+        if last_event_id is not None:
+            params["last-event-id"] = _jsons(last_event_id)
+        if limit is not None:
+            params["limit"] = _jsons(limit)
+        if since is not None:
+            params["since"] = _jsons(since)
+        if style is not None:
+            params["style"] = style
+        if timeout is not None:
+            params["timeout"] = _jsons(timeout)
+        if view is not None:
+            params["view"] = view
+        if seq_interval is not None:
+            params["seq_interval"] = _jsons(seq_interval)
+        response = self.server._POST(self.name, "_changes",
+                                     params=params, json=data,
+                                     headers={"Content-Type": JSON_MIME})
+        return response.json()
+            
     def dump(self, filepath, callback=None):
         """Dumps the entire database to a `tar` file.
 
@@ -887,13 +960,12 @@ class Database(object):
                     self.put_attachment(doc, itemdata, **atts.pop(item.name))
                     nfiles += 1
                 else:
-                    doc = json.loads(itemdata.decode("utf-8"),
-                                     object_pairs_hook=dict)
+                    doc = json.loads(itemdata.decode("utf-8"))
                     doc.pop("_rev", None)
                     atts = doc.pop("_attachments", dict())
                     self.put(doc)
                     ndocs += 1
-                    for attname, attinfo in atts.items():
+                    for attname, attinfo in list(atts.items()):
                         key = u"{}_att/{}".format(doc["_id"], attname)
                         atts[key] = dict(filename=attname,
                                          content_type=attinfo["content_type"])
@@ -925,7 +997,7 @@ class _DatabaseIterator(object):
             response = self.db.server._GET(self.db.name,
                                            "_all_docs",
                                            params=self.params)
-            data = response.json(object_pairs_hook=dict)
+            data = response.json()
             rows = data["rows"]
             if len(rows) == 0:
                 raise StopIteration
@@ -1256,7 +1328,7 @@ def json_input(filepath):
     "Read the JSON document file."
     try:
         with open(filepath, "r") as infile:
-            return json.load(infile, object_pairs_hook=dict)
+            return json.load(infile, )
     except (IOError, ValueError, TypeError) as error:
         sys.exit(f"Error: {error}")
 
@@ -1343,7 +1415,7 @@ def _execute(pargs, settings):
         _json_output(pargs, doc, else_print=True)
     elif pargs.put:
         try:  # Attempt to interpret arg as explicit doc
-            doc = json.loads(pargs.put, object_pairs_hook=dict)
+            doc = json.loads(pargs.put)
         except (ValueError, TypeError):  # Arg is filepath to doc
             doc = json_input(pargs.put)
         _get_database(server, settings).put(doc)
