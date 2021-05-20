@@ -51,8 +51,8 @@ db.destroy()
 - 1.11.0
   - Added `db.changes()`. **But not adequately tested!**
   - Corrected returned value from `set_replicate`: JSON data rather than
-    response form `requests`.
-  - Refactored code: got rid of `object_pairs_hook=dict` in `json()`,
+    response from `requests`.
+  - Refactored code: Got rid of `object_pairs_hook=dict` in `json()`.
     `response.json()` on a separate line everywhere.
 - 1.10.0
   - Changed to unittest for the test script. Got rid of package `pytest`.
