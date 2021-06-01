@@ -189,8 +189,8 @@ class Test(unittest.TestCase):
         # Get all rows without sorting results.
         result = db.view("docs", "name", sorted=False)
         self.assertEqual(len(result.rows), 1)
-        self.assertIsNone(result.offset)
-        self.assertIsNone(result.total_rows)
+        self.assertEqual(result.offset, 0)
+        self.assertEqual(result.total_rows, 1)
         # Get all rows, with documents.
         result = db.view("docs", "name", include_docs=True)
         self.assertEqual(len(result.rows), 1)
