@@ -37,7 +37,7 @@ class Server:
     "An instance of the class is a connection to the CouchDB server."
 
     def __init__(self, href="http://localhost:5984/",
-                 username=None, password=None, use_session=True, ca_file=None):
+                 username=None, password=None, use_session=True, ca_file=None, ignore_ssl_verify=False):
         """An instance of the class is a connection to the CouchDB server.
 
         - `href` is the URL to the CouchDB server itself.
@@ -47,11 +47,14 @@ class Server:
           sent with each request.
         - `ca_file` is a path to a file or a directory containing CAs if
           you need to access databases in HTTPS.
+        - if ignore_ssl_verify is `True` then ssl verification is disabled. Don't use it
+          in production! It makes software vulnerable to MITM attacks!
         """
         self.href = href.rstrip("/") + "/"
         self._session = requests.Session()
         self._session.headers.update({"Accept": JSON_MIME})
         if ca_file is not None:
+            # it seems like a mistype, possibly it's self._session.cert ?
             self._session.verify = ca_file
         if username and password:
             if use_session:
@@ -59,6 +62,9 @@ class Server:
                            data={"name": username, "password": password})
             else:
                 self._session.auth = (username, password)
+        if ignore_ssl_verify:
+            self._session.verify = False
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     @property
     def version(self):
