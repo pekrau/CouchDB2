@@ -180,7 +180,7 @@ class Test(unittest.TestCase):
         # Get all rows without documents: one single in result.
         result = db.view("docs", "name")
         self.assertEqual(len(result.rows), 1)
-        self.assertEqual(result.offset, 0)  # CouchDB v2.3.1
+        self.assertEqual(result.offset, 0)
         self.assertEqual(result.total_rows, 1)
         row = result.rows[0]
         self.assertEqual(row.key, "mine")
@@ -189,8 +189,10 @@ class Test(unittest.TestCase):
         # Get all rows without sorting results.
         result = db.view("docs", "name", sorted=False)
         self.assertEqual(len(result.rows), 1)
-        self.assertIsNone(result.offset)  # CouchDB v2.3.1
-        self.assertIsNone(result.total_rows)  # CouchDB v2.3.1
+        # XXX Weird?! With CouchDB v3.1.1, 'offset' and 'total_offset'
+        # are randomly returned as 0 and 1, respectively, or not at all.
+        self.assertTrue((result.offset == 0) or (result.offset is None))
+        self.assertTrue((result.total_rows == 1) or (result.total_rows is None))
         # Get all rows, with documents.
         result = db.view("docs", "name", include_docs=True)
         self.assertEqual(len(result.rows), 1)
