@@ -271,7 +271,7 @@ class Server:
 
     def _href(self, segments):
         "Return the complete URL."
-        return self.href + "/".join(segments)
+        return self.href + urllib.parse.quote("/".join(segments))
 
     def _kwargs(self, kwargs, *keys):
         "Return the kwargs for the specified keys."
@@ -798,7 +798,7 @@ class Database:
         except KeyError:
             params = {}
         response = self.server._GET(self.name, doc["_id"],
-                                    urllib.parse.quote(filename),
+                                    filename,
                                     params=params)
         return io.BytesIO(response.content)
 
@@ -825,7 +825,7 @@ class Database:
             (content_type, enc) = mimetypes.guess_type(filename, strict=False)
             if not content_type: content_type = BIN_MIME
         response = self.server._PUT(self.name, doc["_id"],
-                                    urllib.parse.quote(filename),
+                                    filename,
                                     data=content,
                                     headers={"Content-Type": content_type,
                                              "If-Match": doc["_rev"]})
@@ -844,7 +844,7 @@ class Database:
         except KeyError:
             headers = {}
         response = self.server._DELETE(self.name, doc["_id"],
-                                       urllib.parse.quote(filename),
+                                       filename,
                                        headers=headers)
         doc["_rev"] = response.json()["rev"]
         # Return the new `_rev` for backwards compatibility reasons.
@@ -933,11 +933,8 @@ class Database:
                     info = tarfile.TarInfo(u"{}_att/{}".format(doc["_id"],
                                                                attname))
                     attfile = self.get_attachment(doc, attname)
-                    if attfile is None:
-                        attdata = ""
-                    else:
-                        attdata = attfile.read()
-                        attfile.close()
+                    attdata = attfile.read()
+                    attfile.close()
                     info.size = len(attdata)
                     outfile.addfile(info, io.BytesIO(attdata))
                     nfiles += 1
