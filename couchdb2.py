@@ -793,12 +793,12 @@ class Database:
 
     def get_attachment(self, doc, filename):
         "Returns a file-like object containing the content of the attachment."
-        filename = urllib.parse.quote(filename)
         try:
             params = {"rev": doc["_rev"]}
         except KeyError:
             params = {}
-        response = self.server._GET(self.name, doc["_id"], filename,
+        response = self.server._GET(self.name, doc["_id"],
+                                    urllib.parse.quote(filename),
                                     params=params)
         return io.BytesIO(response.content)
 
@@ -824,7 +824,8 @@ class Database:
         if not content_type:
             (content_type, enc) = mimetypes.guess_type(filename, strict=False)
             if not content_type: content_type = BIN_MIME
-        response = self.server._PUT(self.name, doc["_id"], filename,
+        response = self.server._PUT(self.name, doc["_id"],
+                                    urllib.parse.quote(filename),
                                     data=content,
                                     headers={"Content-Type": content_type,
                                              "If-Match": doc["_rev"]})
@@ -838,8 +839,13 @@ class Database:
         Returns the new revision of the document, in addition to updating
         the `_rev` field in the document.
         """
-        response = self.server._DELETE(self.name, doc["_id"], filename,
-                                       headers={"If-Match": doc["_rev"]})
+        try:
+            headers = {"If-Match": doc["_rev"]}
+        except KeyError:
+            headers = {}
+        response = self.server._DELETE(self.name, doc["_id"],
+                                       urllib.parse.quote(filename),
+                                       headers=headers)
         doc["_rev"] = response.json()["rev"]
         # Return the new `_rev` for backwards compatibility reasons.
         return doc["_rev"]
