@@ -5,7 +5,7 @@ Most, but not all, features of this module work with CouchDB version < 2.0.
 Relies on 'requests': http://docs.python-requests.org/en/master/
 """
 
-__version__ = "1.11.0"
+__version__ = "1.11.1"
 
 # Standard packages
 import argparse
@@ -20,6 +20,7 @@ import os.path
 import tarfile
 import sys
 import time
+import urllib.parse
 import uuid
 
 if sys.version_info[:2] < (3, 7):
@@ -792,8 +793,13 @@ class Database:
 
     def get_attachment(self, doc, filename):
         "Returns a file-like object containing the content of the attachment."
+        filename = urllib.parse.quote(filename)
+        try:
+            params = {"rev": doc["_rev"]}
+        except KeyError:
+            params = {}
         response = self.server._GET(self.name, doc["_id"], filename,
-                                    params={"rev": doc["_rev"]})
+                                    params=params)
         return io.BytesIO(response.content)
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
