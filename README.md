@@ -15,6 +15,7 @@ $ pip install couchdb2
 ```
 
 The module relies on `requests`: http://docs.python-requests.org/en/master/
+and on `tqdm`: https://tqdm.github.io/
 
 ## Example code
 
@@ -48,6 +49,10 @@ db.destroy()
 
 ## News
 
+- 1.12.0
+  - Added progressbar to `dump` and `undump`, using `tqdm`.
+  - Corrected bug fetching attachments with names having "weird" characters.
+  - Corrected bug creating partitioned database; thanks to https://github.com/N-Vlahovic
 - 1.11.0
   - Added `db.changes()`. **But not adequately tested!**
   - Corrected returned value from `set_replicate`: JSON data rather than
@@ -580,20 +585,24 @@ Deletes the attachment.
 Returns the new revision of the document, in addition to updating
 the `_rev` field in the document.
 
-### `db.dump(filepath, callback=None)`
+### `db.dump(filepath, callback=None, exclude_designs=False, progressbar=False)`
 
 Dumps the entire database to a `tar` file.
 
-Return a tuple `(ndocs, nfiles)` giving the number of documents
+Returns a tuple `(ndocs, nfiles)` giving the number of documents
 and attached files written out.
 
 If defined, the function `callback(ndocs, nfiles)` is called 
 every 100 documents.
 
-If the filepath ends with `.gz`, then the tar file is gzip compressed.
-The `_rev` item of each document is written out.
+If `exclude_designs` is True, design document will be excluded from the dump.
 
-### `db.undump(filepath, callback=None)`
+If `progressbar` is True, display a progress bar.
+
+If the filepath ends with `.gz`, then the tar file is gzip compressed.
+The `_rev` item of each document is included in the dump.
+
+### `db.undump(filepath, callback=None, progressbar=False)`
 
 Loads the `tar` file given by the path. It must have been produced by `db.dump`.
 
@@ -602,6 +611,8 @@ and attached files read from the file.
 
 If defined, the function `callback(ndocs, nfiles)` is called 
 every 100 documents.
+
+If `progressbar` is True, display a progress bar.
 
 **NOTE**: The documents are just added to the database, ignoring any
 `_rev` items. This means that no document with the same identifier
@@ -727,79 +738,79 @@ CouchDB v2.x command line tool, leveraging Python module CouchDB2.
 
 optional arguments:
   -h, --help            show this help message and exit
-  --settings FILEPATH   settings file in JSON format
+  --settings FILEPATH   Settings file in JSON format.
   -S SERVER, --server SERVER
-                        CouchDB server URL, including port number
+                        CouchDB server URL, including port number.
   -d DATABASE, --database DATABASE
-                        database to operate on
+                        Database to operate on.
   -u USERNAME, --username USERNAME
-                        CouchDB user account name
+                        CouchDB user account name.
   -p PASSWORD, --password PASSWORD
-                        CouchDB user account password
+                        CouchDB user account password.
   -q, --password_question
-                        ask for the password by interactive input
-  --ca_file FILEORDIRPATH
-                        file or directory containing CAs
+                        Ask for the password by interactive input.
+  --ca_file FILE_OR_DIRPATH
+                        File or directory containing CAs.
   -o FILEPATH, --output FILEPATH
-                        write output to the given file (JSON format)
-  --indent INT          indentation level for JSON format output file
-  -y, --yes             do not ask for confirmation (delete, destroy)
-  -v, --verbose         print more information
-  -s, --silent          print no information
+                        Write output to the given file (JSON format).
+  --indent INT          Indentation level for JSON format output file.
+  -y, --yes             Do not ask for confirmation (delete, destroy, undump).
+  -v, --verbose         Print more information.
+  -s, --silent          Print no information.
 
 server operations:
-  -V, --version         output CouchDB server version
-  --list                output a list of the databases on the server
+  -V, --version         Output CouchDB server version.
+  --list                Output a list of the databases on the server.
 
-database operations:
-  --create              create the database
-  --destroy             delete the database and all its contents
-  --compact             compact the database; may take some time
+Database operations.:
+  --create              Create the database.
+  --destroy             Delete the database and all its contents.
+  --compact             Compact the database; may take some time.
   --compact_design DDOC
-                        compact the view indexes for the named design doc
-  --view_cleanup        remove view index files no longer required
-  --info                output information about the database
-  --security            output security information for the database
+                        Compact the view indexes for the named design doc.
+  --view_cleanup        Remove view index files no longer required.
+  --info                Output information about the database.
+  --security            Output security information for the database.
   --set_security FILEPATH
-                        set security information for the database from the
-                        JSON file
-  --list_designs        list design documents for the database
-  --design DDOC         output the named design document
+                        Set security information for the database from the
+                        JSON file.
+  --list_designs        List design documents for the database.
+  --design DDOC         Output the named design document.
   --put_design DDOC FILEPATH
-                        store the named design document from the file
-  --delete_design DDOC  delete the named design document
-  --dump FILEPATH       create a dump file of the database
-  --undump FILEPATH     load a dump file into the database
+                        Store the named design document from the file.
+  --delete_design DDOC  Delete the named design document.
+  --dump FILEPATH       Create a dump file of the database.
+  --undump FILEPATH     Load a dump file into the database.
 
-document operations:
+Document operations.:
   -G DOCID, --get DOCID
-                        output the document with the given identifier
+                        Output the document with the given identifier.
   -P FILEPATH, --put FILEPATH
-                        store the document; arg is literal doc or filepath
-  --delete DOCID        delete the document with the given identifier
+                        Store the document; arg is literal doc or filepath.
+  --delete DOCID        Delete the document with the given identifier.
 
 attachments to document:
   --attach DOCID FILEPATH
-                        attach the specified file to the given document
+                        Attach the specified file to the given document.
   --detach DOCID FILENAME
-                        remove the attached file from the given document
+                        Remove the attached file from the given document.
   --get_attach DOCID FILENAME
-                        get the attached file from the given document; write
-                        to same filepath or that given by '-o'
+                        Get the attached file from the given document; write
+                        to same filepath or that given by '-o'.
 
 query a design view, returning rows:
-  --view SPEC           design view '{design}/{view}' to query
-  --key KEY             key value selecting view rows
-  --startkey KEY        start key value selecting range of view rows
-  --endkey KEY          end key value selecting range of view rows
+  --view SPEC           Design view '{design}/{view}' to query.
+  --key KEY             Key value selecting view rows.
+  --startkey KEY        Start key value selecting range of view rows.
+  --endkey KEY          End key value selecting range of view rows.
   --startkey_docid DOCID
-                        return rows starting with the specified document
-  --endkey_docid DOCID  stop returning rows when specified document reached
-  --group               group the results using the 'reduce' function
-  --group_level INT     specify the group level to use
-  --noreduce            do not use the 'reduce' function of the view
-  --limit INT           limit the number of returned rows
-  --skip INT            skip this number of rows before returning result
-  --descending          sort rows in descending order (swap start/end keys!)
-  --include_docs        include documents in result
+                        Return rows starting with the specified document.
+  --endkey_docid DOCID  Stop returning rows when specified document reached.
+  --group               Group the results using the 'reduce' function.
+  --group_level INT     Specify the group level to use.
+  --noreduce            Do not use the 'reduce' function of the view.
+  --limit INT           Limit the number of returned rows.
+  --skip INT            Skip this number of rows before returning result.
+  --descending          Sort rows in descending order (swap start/end keys!).
+  --include_docs        Include documents in result.
 ```

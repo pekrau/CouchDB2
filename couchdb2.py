@@ -3,9 +3,10 @@
 Most, but not all, features of this module work with CouchDB version < 2.0.
 
 Relies on 'requests': http://docs.python-requests.org/en/master/
+and on `tqdm`: https://tqdm.github.io/
 """
 
-__version__ = "1.11.1"
+__version__ = "1.12.0"
 
 # Standard packages
 import argparse
@@ -28,6 +29,9 @@ if sys.version_info[:2] < (3, 7):
 
 # Third-party package: https://docs.python-requests.org/en/master/
 import requests
+
+# Third-party package: https://tqdm.github.io/
+import tqdm
 
 JSON_MIME = "application/json"
 BIN_MIME = "application/octet-stream"
@@ -248,8 +252,9 @@ class Server:
 
     def _PUT(self, *segments, **kwargs):
         "HTTP PUT request to the CouchDB server, and check the response."
+        query = kwargs.pop("query", {})
         kw = self._kwargs(kwargs, "json", "data", "headers")
-        response = self._session.put(self._href(segments), **kw)
+        response = self._session.put(self._href(segments, **query), **kw)
         self._check(response, errors=kwargs.get("errors", {}))
         return response
 
@@ -269,9 +274,12 @@ class Server:
         self._check(response, errors=kwargs.get("errors", {}))
         return response
 
-    def _href(self, segments):
+    def _href(self, segments, **query):
         "Return the complete URL."
-        return self.href + urllib.parse.quote("/".join(segments))
+        url = self.href + urllib.parse.quote("/".join(segments))
+        if query:
+            url += "?" + urllib.parse.urlencode(query)
+        return url
 
     def _kwargs(self, kwargs, *keys):
         "Return the kwargs for the specified keys."
@@ -347,8 +355,8 @@ class Database:
         - `q`: The number of shards.
         - `partitioned`: Whether to create a partitioned database.
         """
-        self.server._PUT(self.name,
-                         data={"n": n, "q": q, "partitioned": partitioned})
+        query = {"n": n, "q": q, "partitioned": str(partitioned).lower()}
+        self.server._PUT(self.name, query=query)
         return self
 
     def destroy(self):
@@ -903,7 +911,7 @@ class Database:
                                      headers={"Content-Type": JSON_MIME})
         return response.json()
             
-    def dump(self, filepath, callback=None):
+    def dump(self, filepath, callback=None, exclude_designs=False, progressbar=False):
         """Dumps the entire database to a `tar` file.
 
         Returns a tuple `(ndocs, nfiles)` giving the number of documents
@@ -912,8 +920,13 @@ class Database:
         If defined, the function `callback(ndocs, nfiles)` is called
         every 100 documents.
 
+        If 'exclude_designs' is True, design document will be excluded
+        from the dump.
+
+        If 'progressbar' is True, display a progress bar.
+
         If the filepath ends with `.gz`, then the tar file is gzip compressed.
-        The `_rev` item of each document is written out.
+        The `_rev` item of each document is included in the dump.
         """
         ndocs = 0
         nfiles = 0
@@ -922,7 +935,13 @@ class Database:
         else:
             mode = "w"
         with tarfile.open(filepath, mode=mode) as outfile:
-            for doc in self:
+            if progressbar:
+                iterator = tqdm.tqdm(self, total=len(self))
+            else:
+                iterator = self
+            for doc in iterator:
+                if exclude_designs and doc["_id"].startswith("_design/"):
+                    continue
                 info = tarfile.TarInfo(doc["_id"])
                 data = _jsons(doc).encode("utf-8")
                 info.size = len(data)
@@ -942,7 +961,7 @@ class Database:
                     callback(ndocs, nfiles)
         return (ndocs, nfiles)
 
-    def undump(self, filepath, callback=None):
+    def undump(self, filepath, callback=None, progressbar=False):
         """Loads the `tar` file given by the path. It must have been
         produced by `db.dump`.
 
@@ -952,15 +971,24 @@ class Database:
         If defined, the function `callback(ndocs, nfiles)` is called
         every 100 documents.
 
+        If 'progressbar' is True, display a progress bar.
+
         NOTE: The documents are just added to the database, ignoring any
         `_rev` items. This means that no document with the same identifier
-        may exist in the database.
+        must exist in the database.
         """
         ndocs = 0
         nfiles = 0
         atts = dict()
+        if progressbar:
+            with tarfile.open(filepath, mode="r") as infile:
+                total = sum(1 for member in infile if member.isreg())
         with tarfile.open(filepath, mode="r") as infile:
-            for item in infile:
+            if progressbar:
+                iterator = tqdm.tqdm(infile, total=total)
+            else:
+                iterator = infile
+            for item in iterator:
                 itemfile = infile.extractfile(item)
                 itemdata = itemfile.read()
                 itemfile.close()
@@ -1106,117 +1134,127 @@ def _get_parser():
                                 description="CouchDB v2.x command line tool,"
                                             " leveraging Python module CouchDB2.")
     p.add_argument("--settings", metavar="FILEPATH",
-                   help="settings file in JSON format")
+                   help="Settings file in JSON format.")
     p.add_argument("-S", "--server",
-                   help="CouchDB server URL, including port number")
-    p.add_argument("-d", "--database", help="database to operate on")
-    p.add_argument("-u", "--username", help="CouchDB user account name")
+                   help="CouchDB server URL, including port number.")
+    p.add_argument("-d", "--database", help="Database to operate on.")
+    p.add_argument("-u", "--username", help="CouchDB user account name.")
+
     x01 = p.add_mutually_exclusive_group()
-    x01.add_argument("-p", "--password", help="CouchDB user account password")
+    x01.add_argument("-p", "--password", help="CouchDB user account password.")
     x01.add_argument("-q", "--password_question", action="store_true",
-                     help="ask for the password by interactive input")
-    p.add_argument("--ca_file", metavar="FILEORDIRPATH",
-                   help="file or directory containing CAs")
+                     help="Ask for the password by interactive input.")
+
+    p.add_argument("--ca_file", metavar="FILE_OR_DIRPATH",
+                   help="File or directory containing CAs.")
     p.add_argument("-o", "--output", metavar="FILEPATH",
-                   help="write output to the given file (JSON format)")
+                   help="Write output to the given file (JSON format).")
     p.add_argument("--indent", type=int, metavar="INT",
-                   help="indentation level for JSON format output file")
+                   help="Indentation level for JSON format output file.")
     p.add_argument("-y", "--yes", action="store_true",
-                   help="do not ask for confirmation (delete, destroy)")
+                   help="Do not ask for confirmation (delete, destroy, undump).")
+
     x02 = p.add_mutually_exclusive_group()
     x02.add_argument("-v", "--verbose", action="store_true",
-                     help="print more information")
+                     help="Print more information.")
     x02.add_argument("-s", "--silent", action="store_true",
-                     help="print no information")
+                     help="Print no information.")
 
     g0 = p.add_argument_group("server operations")
     g0.add_argument("-V", "--version", action="store_true",
-                    help="output CouchDB server version")
+                    help="Output CouchDB server version.")
     g0.add_argument("--list", action="store_true",
-                    help="output a list of the databases on the server")
+                    help="Output a list of the databases on the server.")
 
-    g1 = p.add_argument_group("database operations")
+    g1 = p.add_argument_group("Database operations.")
+
     x11 = g1.add_mutually_exclusive_group()
     x11.add_argument("--create", action="store_true",
-                     help="create the database")
+                     help="Create the database.")
     x11.add_argument("--destroy", action="store_true",
-                     help="delete the database and all its contents")
+                     help="Delete the database and all its contents.")
+
     g1.add_argument("--compact", action="store_true",
-                    help="compact the database; may take some time")
+                    help="Compact the database; may take some time.")
     g1.add_argument("--compact_design", metavar="DDOC",
-                    help="compact the view indexes for the named design doc")
+                    help="Compact the view indexes for the named design doc.")
     g1.add_argument("--view_cleanup", action="store_true",
-                    help="remove view index files no longer required")
+                    help="Remove view index files no longer required.")
     g1.add_argument("--info", action="store_true",
-                    help="output information about the database")
+                    help="Output information about the database.")
+
     x12 = g1.add_mutually_exclusive_group()
     x12.add_argument("--security", action="store_true",
-                     help="output security information for the database")
+                     help="Output security information for the database.")
     x12.add_argument("--set_security", metavar="FILEPATH",
-                     help="set security information for the database"
-                          " from the JSON file")
+                     help="Set security information for the database"
+                          " from the JSON file.")
+
     x13 = g1.add_mutually_exclusive_group()
     x13.add_argument("--list_designs", action="store_true",
-                     help="list design documents for the database")
+                     help="List design documents for the database.")
     x13.add_argument("--design", metavar="DDOC",
-                     help="output the named design document")
+                     help="Output the named design document.")
     x13.add_argument("--put_design", nargs=2, metavar=("DDOC", "FILEPATH"),
-                     help="store the named design document from the file")
+                     help="Store the named design document from the file.")
     x13.add_argument("--delete_design", metavar="DDOC",
-                     help="delete the named design document")
+                     help="Delete the named design document.")
+
     x14 = g1.add_mutually_exclusive_group()
     x14.add_argument("--dump", metavar="FILEPATH",
-                     help="create a dump file of the database")
+                     help="Create a dump file of the database.")
     x14.add_argument("--undump", metavar="FILEPATH",
-                     help="load a dump file into the database")
+                     help="Load a dump file into the database.")
 
-    g2 = p.add_argument_group("document operations")
+    g2 = p.add_argument_group("Document operations.")
     x2 = g2.add_mutually_exclusive_group()
     x2.add_argument("-G", "--get", metavar="DOCID",
-                    help="output the document with the given identifier")
+                    help="Output the document with the given identifier.")
     x2.add_argument("-P", "--put", metavar="FILEPATH",
-                    help="store the document; arg is literal doc or filepath")
+                    help="Store the document; arg is literal doc or filepath.")
     x2.add_argument("--delete", metavar="DOCID",
-                    help="delete the document with the given identifier")
+                    help="Delete the document with the given identifier.")
 
     g3 = p.add_argument_group("attachments to document")
     x3 = g3.add_mutually_exclusive_group()
     x3.add_argument("--attach", nargs=2, metavar=("DOCID", "FILEPATH"),
-                    help="attach the specified file to the given document")
+                    help="Attach the specified file to the given document.")
     x3.add_argument("--detach", nargs=2, metavar=("DOCID", "FILENAME"),
-                    help="remove the attached file from the given document")
+                    help="Remove the attached file from the given document.")
     x3.add_argument("--get_attach", nargs=2, metavar=("DOCID", "FILENAME"),
-                    help="get the attached file from the given document;"
-                         " write to same filepath or that given by '-o'")
+                    help="Get the attached file from the given document;"
+                         " write to same filepath or that given by '-o'.")
 
     g4 = p.add_argument_group("query a design view, returning rows")
     g4.add_argument("--view", metavar="SPEC",
-                    help="design view '{design}/{view}' to query")
+                    help="Design view '{design}/{view}' to query.")
+
     x41 = g4.add_mutually_exclusive_group()
     x41.add_argument("--key", metavar="KEY",
-                     help="key value selecting view rows")
+                     help="Key value selecting view rows.")
     x41.add_argument("--startkey", metavar="KEY",
-                     help="start key value selecting range of view rows")
+                     help="Start key value selecting range of view rows.")
+
     g4.add_argument("--endkey", metavar="KEY",
-                    help="end key value selecting range of view rows")
+                    help="End key value selecting range of view rows.")
     g4.add_argument("--startkey_docid", metavar="DOCID",
-                    help="return rows starting with the specified document")
+                    help="Return rows starting with the specified document.")
     g4.add_argument("--endkey_docid", metavar="DOCID",
-                    help="stop returning rows when specified document reached")
+                    help="Stop returning rows when specified document reached.")
     g4.add_argument("--group", action="store_true",
-                    help="group the results using the 'reduce' function")
+                    help="Group the results using the 'reduce' function.")
     g4.add_argument("--group_level", type=int, metavar="INT",
-                    help="specify the group level to use")
+                    help="Specify the group level to use.")
     g4.add_argument("--noreduce", action="store_true",
-                    help="do not use the 'reduce' function of the view")
+                    help="Do not use the 'reduce' function of the view.")
     g4.add_argument("--limit", type=int, metavar="INT",
-                    help="limit the number of returned rows")
+                    help="Limit the number of returned rows.")
     g4.add_argument("--skip", type=int, metavar="INT",
-                    help="skip this number of rows before returning result")
+                    help="Skip this number of rows before returning result.")
     g4.add_argument("--descending", action="store_true",
-                    help="sort rows in descending order (swap start/end keys!)")
+                    help="Sort rows in descending order (swap start/end keys!).")
     g4.add_argument("--include_docs", action="store_true",
-                    help="include documents in result")
+                    help="Include documents in result.")
     return p
 
 
@@ -1483,22 +1521,18 @@ def _execute(pargs, settings):
         if pargs.silent:
             db.dump(pargs.dump)
         else:
-            print(f"Dumping '{db}'.", sep="", end="")
-            sys.stdout.flush()
-            ndocs, nfiles = db.dump(pargs.dump, callback=_print_dot)
-            print()
+            ndocs, nfiles = db.dump(pargs.dump, progressbar=True)
             print(f"Dumped {ndocs} documents, {nfiles} files.")
     elif pargs.undump:
         db = _get_database(server, settings)
-        if len(db) != 0:
-            sys.exit(f"Error: Database '{db}' is not empty")
+        if not pargs.yes and len(db) != 0:
+            answer = input(f"Database '{db}' is not empty; load anyway? [n] ? ")
+            if not (answer and answer.lower()[0] in ("y", "t")):
+                return
         if pargs.silent:
             db.undump(pargs.undump)
         else:
-            print(f"Undumping '{db}'.", sep="", end="")
-            sys.stdout.flush()
-            ndocs, nfiles = db.undump(pargs.undump, callback=_print_dot)
-            print()
+            ndocs, nfiles = db.undump(pargs.undump, progressbar=True)
             print(f"Undumped {ndocs} documents, {nfiles} files.")
 
 

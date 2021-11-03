@@ -15,7 +15,8 @@ setup(name="CouchDB2",
       python_requires=">= 3.6",
       py_modules=["couchdb2"],
       install_requires=[
-          "requests>=2",
+          "requests>=2.26",
+          "tqdm>=4.62",
       ],
       entry_points={
           "console_scripts": ["couchdb2=couchdb2:main"]
