@@ -351,7 +351,7 @@ class Database:
         - `q`: The number of shards.
         - `partitioned`: Whether to create a partitioned database.
         """
-        params = {"n": n, "q": q, "partitioned": str(partitioned).lower()}
+        params = {"n": n, "q": q, "partitioned": str(bool(partitioned)).lower()}
         self.server._PUT(self.name, params=params)
         return self
 
