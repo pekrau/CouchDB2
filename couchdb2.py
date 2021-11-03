@@ -3,7 +3,7 @@
 Most, but not all, features of this module work with CouchDB version < 2.0.
 
 Relies on 'requests': http://docs.python-requests.org/en/master/
-and on `tqdm`: https://tqdm.github.io/
+and `tqdm`: https://tqdm.github.io/
 """
 
 __version__ = "1.12.0"
@@ -252,9 +252,8 @@ class Server:
 
     def _PUT(self, *segments, **kwargs):
         "HTTP PUT request to the CouchDB server, and check the response."
-        query = kwargs.pop("query", {})
-        kw = self._kwargs(kwargs, "json", "data", "headers")
-        response = self._session.put(self._href(segments, **query), **kw)
+        kw = self._kwargs(kwargs, "json", "data", "headers", "params")
+        response = self._session.put(self._href(segments), **kw)
         self._check(response, errors=kwargs.get("errors", {}))
         return response
 
@@ -274,12 +273,9 @@ class Server:
         self._check(response, errors=kwargs.get("errors", {}))
         return response
 
-    def _href(self, segments, **query):
+    def _href(self, segments):
         "Return the complete URL."
-        url = self.href + urllib.parse.quote("/".join(segments))
-        if query:
-            url += "?" + urllib.parse.urlencode(query)
-        return url
+        return self.href + urllib.parse.quote("/".join(segments))
 
     def _kwargs(self, kwargs, *keys):
         "Return the kwargs for the specified keys."
@@ -355,8 +351,8 @@ class Database:
         - `q`: The number of shards.
         - `partitioned`: Whether to create a partitioned database.
         """
-        query = {"n": n, "q": q, "partitioned": str(partitioned).lower()}
-        self.server._PUT(self.name, query=query)
+        params = {"n": n, "q": q, "partitioned": str(partitioned).lower()}
+        self.server._PUT(self.name, params=params)
         return self
 
     def destroy(self):

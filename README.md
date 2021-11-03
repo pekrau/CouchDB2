@@ -15,7 +15,7 @@ $ pip install couchdb2
 ```
 
 The module relies on `requests`: http://docs.python-requests.org/en/master/
-and on `tqdm`: https://tqdm.github.io/
+and `tqdm`: https://tqdm.github.io/
 
 ## Example code
 
