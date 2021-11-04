@@ -2,11 +2,11 @@
 
 Most, but not all, features of this module work with CouchDB version < 2.0.
 
-Relies on 'requests': http://docs.python-requests.org/en/master/
+Relies on `requests`: http://docs.python-requests.org/en/master/
 and `tqdm`: https://tqdm.github.io/
 """
 
-__version__ = "1.13.0"
+__version__ = "1.13.1"
 
 # Standard packages
 import argparse
@@ -60,8 +60,8 @@ class Server:
             self._session.verify = ca_file
         if username and password:
             if use_session:
-                self._POST("_session",
-                           data={"name": username, "password": password})
+                data = {"name": username, "password": password}
+                self._POST("_session", data=data)
             else:
                 self._session.auth = (username, password)
 
@@ -110,7 +110,7 @@ class Server:
         return response.json()
 
     def __del__(self):
-        "Clean-up: Close the 'requests' session."
+        "Clean-up: Close the `requests` session."
         self._session.close()
 
     def up(self):
@@ -200,8 +200,8 @@ class Server:
     def get_scheduler_jobs(self, limit=None, skip=None):
         """Gets a list of replication jobs.
 
-        - 'limit': How many results to return.
-        - 'skip': How many result to skip starting at the beginning,
+        - `limit`: How many results to return.
+        - `skip`: How many result to skip starting at the beginning,
           ordered by replication ID.
         """
         params = {}
@@ -215,8 +215,8 @@ class Server:
     def get_scheduler_docs(self, limit=None, skip=None):
         """Gets information about replication document(s).
 
-        - 'limit': How many results to return.
-        - 'skip': How many result to skip starting at the beginning,
+        - `limit`: How many results to return.
+        - `skip`: How many result to skip starting at the beginning,
           ordered by document ID.
         """
         params = {}
@@ -266,7 +266,7 @@ class Server:
 
     def _DELETE(self, *segments, **kwargs):
         """HTTP DELETE request to the CouchDB server, and check the response.
-        Pass parameters in the keyword argument 'params'.
+        Pass parameters in the keyword argument `params`.
         """
         kw = self._kwargs(kwargs, "headers")
         response = self._session.delete(self._href(segments), **kw)
@@ -340,12 +340,12 @@ class Database:
         return response.status_code == 200
 
     def check(self):
-        "Raises 'NotFoundError' if the database does not exist."
+        "Raises `NotFoundError` if the database does not exist."
         if not self.exists():
             raise NotFoundError(f"Database '{self}' does not exist.")
 
     def create(self, n=3, q=8, partitioned=False):
-        """Creates the database. Raises 'CreationError' if it already exists.
+        """Creates the database. Raises `CreationError` if it already exists.
 
         - `n`: The number of replicas.
         - `q`: The number of shards.
@@ -384,8 +384,8 @@ class Database:
         - In addition, if defined, the function `callback(seconds)` is called
           every second until compaction is done.
         """
-        self.server._POST(self.name, "_compact",
-                          headers={"Content-Type": JSON_MIME})
+        headers = {"Content-Type": JSON_MIME}
+        self.server._POST(self.name, "_compact", headers=headers)
         if finish:
             response = self.server._GET(self.name)
             seconds = 0
@@ -397,8 +397,8 @@ class Database:
 
     def compact_design(self, designname):
         "Compacts the view indexes associated with the named design document."
-        self.server._POST(self.name, "_compact", designname,
-                          headers={"Content-Type": JSON_MIME})
+        headers = {"Content-Type": JSON_MIME}
+        self.server._POST(self.name, "_compact", designname, headers=headers)
 
     def view_cleanup(self):
         """Removes unnecessary view index files due to changed views in
@@ -445,7 +445,7 @@ class Database:
                 docs.append({"id": id[0], "rev": id[1]})
             else:
                 docs.append({"id": id})
-        response = self.server._POST(self.name, "_bulk_get", json={"docs": docs})
+        response = self.server._POST(self.name, "_bulk_get", json={"docs":docs})
         return [i["docs"][0].get("ok") for i in response.json()["results"]]
 
     def ids(self):
@@ -498,9 +498,9 @@ class Database:
             else:
                 raise TypeError("expected dict, got %s" % type(doc))
 
-        response = self.server._POST(self.name + "/_bulk_docs",
-                                 data=json.dumps({"docs": documents}),
-                                 headers={"Content-Type": JSON_MIME})
+        response = self.server._POST(self.name, "_bulk_docs",
+                                     data=json.dumps({"docs": documents}),
+                                     headers={"Content-Type": JSON_MIME})
 
         data = response.json()
         results = []
@@ -536,7 +536,7 @@ class Database:
                 content[doc["_id"]] = [doc["_rev"]]
             else:
                 raise TypeError("expected dict, got %s" % type(doc))
-        response = self.server._POST(self.name + "/_purge",
+        response = self.server._POST(self.name, "_purge",
                                      data=json.dumps(content),
                                      headers={"Content-Type": JSON_MIME})
         return response.json()
@@ -625,7 +625,7 @@ class Database:
           use the reduce function if defined.
         - `include_docs=False`: If `True`, include the document for each row.
           This will force `reduce` to `False`.
-        - `update="true"`: Whether ir not the view should be updated prior to
+        - `update="true"`: Whether or not the view should be updated prior to
           returning the result. Supported value are `"true"`, `"false"`
           and `"lazy"`.
 
@@ -674,7 +674,9 @@ class Database:
         response = self.server._GET(self.name, "_design", designname,
                                     "_view", viewname, params=params)
         data = response.json()
-        return ViewResult([Row(r.get("id"), r.get("key"), r.get("value"),
+        return ViewResult([Row(r.get("id"),
+                               r.get("key"),
+                               r.get("value"),
                                r.get("doc")) for r in data.get("rows", [])],
                           data.get("offset"),
                           data.get("total_rows"))
@@ -803,8 +805,7 @@ class Database:
             params = {"rev": doc["_rev"]}
         except KeyError:
             params = {}
-        response = self.server._GET(self.name, doc["_id"],
-                                    filename,
+        response = self.server._GET(self.name, doc["_id"], filename,
                                     params=params)
         return io.BytesIO(response.content)
 
@@ -830,11 +831,9 @@ class Database:
         if not content_type:
             (content_type, enc) = mimetypes.guess_type(filename, strict=False)
             if not content_type: content_type = BIN_MIME
-        response = self.server._PUT(self.name, doc["_id"],
-                                    filename,
-                                    data=content,
-                                    headers={"Content-Type": content_type,
-                                             "If-Match": doc["_rev"]})
+        headers = {"Content-Type": content_type, "If-Match": doc["_rev"]}
+        response = self.server._PUT(self.name, doc["_id"], filename,
+                                    data=content, headers=headers)
         doc["_rev"] = response.json()["rev"]
         # Return the new `_rev` for backwards compatibility reasons.
         return doc["_rev"]
@@ -849,8 +848,7 @@ class Database:
             headers = {"If-Match": doc["_rev"]}
         except KeyError:
             headers = {}
-        response = self.server._DELETE(self.name, doc["_id"],
-                                       filename,
+        response = self.server._DELETE(self.name, doc["_id"], filename,
                                        headers=headers)
         doc["_rev"] = response.json()["rev"]
         # Return the new `_rev` for backwards compatibility reasons.
@@ -868,8 +866,8 @@ class Database:
         https://docs.couchdb.org/en/stable/api/database/changes.html
 
         NOTE: This implementation has not been adequately tested.
-        In particular, the behaviour with a 'feed' value other than
-        the default 'normal' is unknown.
+        In particular, the behaviour with a `feed` value other than
+        the default `normal` is unknown.
         """
         params = {}
         data = None
@@ -904,9 +902,9 @@ class Database:
             params["view"] = view
         if seq_interval is not None:
             params["seq_interval"] = _jsons(seq_interval)
+        headers = {"Content-Type": JSON_MIME}
         response = self.server._POST(self.name, "_changes",
-                                     params=params, json=data,
-                                     headers={"Content-Type": JSON_MIME})
+                                     params=params, json=data, headers=headers)
         return response.json()
             
     def dump(self, filepath, callback=None, exclude_designs=False, progressbar=False):
@@ -918,10 +916,10 @@ class Database:
         If defined, the function `callback(ndocs, nfiles)` is called
         every 100 documents.
 
-        If 'exclude_designs' is True, design document will be excluded
+        If `exclude_designs` is True, design document will be excluded
         from the dump.
 
-        If 'progressbar' is True, display a progress bar.
+        If `progressbar` is True, display a progress bar.
 
         If the filepath ends with `.gz`, then the tar file is gzip compressed.
         The `_rev` item of each document is included in the dump.
@@ -969,7 +967,7 @@ class Database:
         If defined, the function `callback(ndocs, nfiles)` is called
         every 100 documents.
 
-        If 'progressbar' is True, display a progress bar.
+        If `progressbar` is True, display a progress bar.
 
         NOTE: The documents are just added to the database, ignoring any
         `_rev` items. This means that no document with the same identifier
@@ -1083,7 +1081,7 @@ class CreationError(CouchDB2Exception):
 
 
 class RevisionError(CouchDB2Exception):
-    "Wrong or missing '_rev' item in the document to put."
+    "Wrong or missing `_rev` item in the document to put."
 
 
 class AuthorizationError(CouchDB2Exception):
@@ -1091,7 +1089,7 @@ class AuthorizationError(CouchDB2Exception):
 
 
 class ContentTypeError(CouchDB2Exception):
-    "Bad 'Content-Type' value in the request."
+    "Bad `Content-Type` value in the request."
 
 
 class ServerError(CouchDB2Exception):
@@ -1327,12 +1325,12 @@ def _get_database(server, settings):
     return server[settings["DATABASE"]]
 
 def _message(pargs, *args):
-    "Unless flag '--silent' was used, print the arguments."
+    "Unless flag `--silent` was used, print the arguments."
     if pargs.silent: return
     print(*args)
 
 def _verbose(pargs, *args):
-    "If flag '--verbose' was used, then print the arguments."
+    "If flag `--verbose` was used, then print the arguments."
     if not pargs.verbose: return
     print(*args)
 
