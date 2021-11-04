@@ -6,7 +6,7 @@ Relies on 'requests': http://docs.python-requests.org/en/master/
 and `tqdm`: https://tqdm.github.io/
 """
 
-__version__ = "1.12.0"
+__version__ = "1.12.1"
 
 # Standard packages
 import argparse
@@ -1011,9 +1011,13 @@ class _DatabaseIterator(object):
     "Iterator over all documents, or all document identifiers, in a database."
 
     def __init__(self, db, limit=CHUNK_SIZE, include_docs=True):
+        if not isinstance(limit, int):
+            raise ValueError("'limit' is not an 'int'")
+        if limit <= 0:
+            raise ValueError("'limit' must be positive")
         self.db = db
         self.params = {"include_docs": bool(include_docs),
-                       "limit": int(limit),
+                       "limit": limit,
                        "skip": 0}
         self.chunk = []
 
