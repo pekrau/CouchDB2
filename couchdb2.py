@@ -6,7 +6,7 @@ Relies on 'requests': http://docs.python-requests.org/en/master/
 and `tqdm`: https://tqdm.github.io/
 """
 
-__version__ = "1.12.1"
+__version__ = "1.13.0"
 
 # Standard packages
 import argparse
@@ -35,7 +35,7 @@ import tqdm
 
 JSON_MIME = "application/json"
 BIN_MIME = "application/octet-stream"
-CHUNK_SIZE = 100
+CHUNK_SIZE = 200
 
 
 class Server:
@@ -449,8 +449,10 @@ class Database:
         return [i["docs"][0].get("ok") for i in response.json()["results"]]
 
     def ids(self):
-        "Returns an iterator over all document identifiers."
-        return _DatabaseIterator(self, include_docs=False)
+        "Returns a generator over all document identifiers."
+        response = self.server._GET(self.name, "_all_docs")
+        data = response.json()
+        return (row["id"] for row in data["rows"])
 
     def put(self, doc):
         """Inserts or updates the document.
@@ -1008,43 +1010,30 @@ class Database:
 
 
 class _DatabaseIterator(object):
-    "Iterator over all documents, or all document identifiers, in a database."
+    "Iterator over all documents in a database."
 
-    def __init__(self, db, limit=CHUNK_SIZE, include_docs=True):
-        if not isinstance(limit, int):
-            raise ValueError("'limit' is not an 'int'")
-        if limit <= 0:
-            raise ValueError("'limit' must be positive")
+    def __init__(self, db):
         self.db = db
-        self.params = {"include_docs": bool(include_docs),
-                       "limit": limit,
-                       "skip": 0}
-        self.chunk = []
+        self.chunks = []
+        ids = list(db.ids()) # Snapshot of all doc id's in db.
+        for i in range(0, len(ids), CHUNK_SIZE):
+            self.chunks.append(ids[i:i+CHUNK_SIZE])
+        self.chunks.reverse()   # To allow efficient pop.
+        self.current_chunk = []
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        return self.next()
-
-    def next(self):
         try:
-            return self.chunk.pop()
+            return self.current_chunk.pop()
         except IndexError:
-            response = self.db.server._GET(self.db.name,
-                                           "_all_docs",
-                                           params=self.params)
-            data = response.json()
-            rows = data["rows"]
-            if len(rows) == 0:
+            if not self.chunks:
                 raise StopIteration
-            if self.params["include_docs"]:
-                self.chunk = [r["doc"] for r in rows]
-            else:
-                self.chunk = [r["id"] for r in rows]
-            self.chunk.reverse()
-            self.params["skip"] = data["offset"] + len(self.chunk)
-            return self.chunk.pop()
+            chunk = self.db.get_bulk(self.chunks.pop())
+            self.current_chunk = [d for d in chunk if d is not None]
+            self.current_chunk.reverse() # To allow efficient pop.
+            return next(self)
 
 
 class ViewResult(object):
