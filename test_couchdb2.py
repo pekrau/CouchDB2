@@ -9,19 +9,20 @@ import couchdb2
 
 
 class Test(unittest.TestCase):
-
     def setUp(self):
-        self.settings = {"SERVER": "http://localhost:5984",
-                         "DATABASE": "test",
-                         "USERNAME": None,
-                         "PASSWORD": None}
+        self.settings = {
+            "SERVER": "http://localhost:5984",
+            "DATABASE": "test",
+            "USERNAME": None,
+            "PASSWORD": None,
+        }
         try:
-            self.settings = couchdb2.read_settings("test_settings.json",
-                                                   self.settings)
+            self.settings = couchdb2.read_settings("test_settings.json", self.settings)
         except IOError:
             pass
-        self.server = couchdb2.Server(username=self.settings["USERNAME"],
-                                      password=self.settings["PASSWORD"])
+        self.server = couchdb2.Server(
+            username=self.settings["USERNAME"], password=self.settings["PASSWORD"]
+        )
 
     def tearDown(self):
         db = self.server.get(self.settings["DATABASE"], check=False)
@@ -76,7 +77,7 @@ class Test(unittest.TestCase):
         # Create a database.
         db = self.server.create(self.settings["DATABASE"])
         self.assertIn(self.settings["DATABASE"], self.server)
-        self.assertEqual(len(self.server), count+1)
+        self.assertEqual(len(self.server), count + 1)
         # Fail to create the database again.
         with self.assertRaises(couchdb2.CreationError):
             another = self.server.create(self.settings["DATABASE"])
@@ -163,18 +164,25 @@ class Test(unittest.TestCase):
         "Test design views containing reduce and count functions."
         db = self.server.create(self.settings["DATABASE"])
         self.assertEqual(len(db), 0)
-        db.put_design("docs",
-                      {"views":
-                       {"name":
-                        {"map": "function (doc) {if (doc.name===undefined) return;"
-                                " emit(doc.name, null);}"},
-                        "name_sum":
-                        {"map": "function (doc) {emit(doc.name, doc.number);}",
-                         "reduce": "_sum"},
-                        "name_count":
-                        {"map": "function (doc) {emit(doc.name, null);}",
-                         "reduce": "_count"}
-                       }})
+        db.put_design(
+            "docs",
+            {
+                "views": {
+                    "name": {
+                        "map": "function (doc) {if (doc.name===undefined) return;"
+                        " emit(doc.name, null);}"
+                    },
+                    "name_sum": {
+                        "map": "function (doc) {emit(doc.name, doc.number);}",
+                        "reduce": "_sum",
+                    },
+                    "name_count": {
+                        "map": "function (doc) {emit(doc.name, null);}",
+                        "reduce": "_count",
+                    },
+                }
+            },
+        )
         doc = {"name": "mine", "number": 2}
         db.put(doc)
         # Get all rows without documents: one single in result.
@@ -241,7 +249,8 @@ class Test(unittest.TestCase):
         """Test the Mango index feature.
         Requires CouchDB server version 2 and later.
         """
-        if not self.server.version >= "2.0": return
+        if not self.server.version >= "2.0":
+            return
         db = self.server.create(self.settings["DATABASE"])
         self.assertEqual(len(db), 0)
         db.put({"name": "Per", "type": "person", "content": "stuff"})
@@ -263,8 +272,9 @@ class Test(unittest.TestCase):
         # Add an index having a partial filter selector.
         ddocname = "mango"
         indexname = "myindex"
-        result = db.put_index(["name"], ddoc=ddocname, name=indexname,
-                              selector={"type": "person"})
+        result = db.put_index(
+            ["name"], ddoc=ddocname, name=indexname, selector={"type": "person"}
+        )
         self.assertEqual(result["id"], "_design/{}".format(ddocname))
         self.assertEqual(result["name"], indexname)
         # Search does not use an index; warns about that.

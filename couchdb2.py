@@ -945,8 +945,8 @@ class Database:
                 ndocs += 1
                 # Attachments must follow their document.
                 for attname in doc.get("_attachments", dict()):
-                    info = tarfile.TarInfo(u"{}_att/{}".format(doc["_id"],
-                                                               attname))
+                    name = u"{}_att/{}".format(doc["_id"], attname)
+                    info = tarfile.TarInfo(name)
                     attfile = self.get_attachment(doc, attname)
                     attdata = attfile.read()
                     attfile.close()
