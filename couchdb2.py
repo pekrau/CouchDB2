@@ -6,7 +6,7 @@ Relies on `requests`: http://docs.python-requests.org/en/master/
 and `tqdm`: https://tqdm.github.io/
 """
 
-__version__ = "1.13.1"
+__version__ = "1.13.2"
 
 # Standard packages
 import argparse
@@ -41,8 +41,14 @@ CHUNK_SIZE = 200
 class Server:
     "An instance of the class is a connection to the CouchDB server."
 
-    def __init__(self, href="http://localhost:5984/",
-                 username=None, password=None, use_session=True, ca_file=None):
+    def __init__(
+        self,
+        href="http://localhost:5984/",
+        username=None,
+        password=None,
+        use_session=True,
+        ca_file=None,
+    ):
         """An instance of the class is a connection to the CouchDB server.
 
         - `href` is the URL to the CouchDB server itself.
@@ -92,8 +98,9 @@ class Server:
     def __iter__(self):
         "Returns an iterator over all user-defined databases on the server."
         data = self._GET("_all_dbs").json()
-        return iter([Database(self, n, check=False)
-                     for n in data if not n.startswith("_")])
+        return iter(
+            [Database(self, n, check=False) for n in data if not n.startswith("_")]
+        )
 
     def __getitem__(self, name):
         "Gets the named database."
@@ -392,7 +399,8 @@ class Database:
             while response.json().get("compact_running"):
                 time.sleep(1)
                 seconds += 1
-                if callback: callback(seconds)
+                if callback:
+                    callback(seconds)
                 response = self.server._GET(self.name)
 
     def compact_design(self, designname):
@@ -422,10 +430,8 @@ class Database:
         if revs_info:
             params["revs_info"] = _jsons(True)
         if conflicts:
-            params['conflicts'] = _jsons(True)
-        response = self.server._GET(self.name, id,
-                                    errors={404: None},
-                                    params=params)
+            params["conflicts"] = _jsons(True)
+        response = self.server._GET(self.name, id, errors={404: None}, params=params)
         if response.status_code == 404:
             return default
         return response.json()
@@ -445,7 +451,7 @@ class Database:
                 docs.append({"id": id[0], "rev": id[1]})
             else:
                 docs.append({"id": id})
-        response = self.server._POST(self.name, "_bulk_get", json={"docs":docs})
+        response = self.server._POST(self.name, "_bulk_get", json={"docs": docs})
         return [i["docs"][0].get("ok") for i in response.json()["results"]]
 
     def ids(self):
@@ -498,9 +504,12 @@ class Database:
             else:
                 raise TypeError("expected dict, got %s" % type(doc))
 
-        response = self.server._POST(self.name, "_bulk_docs",
-                                     data=json.dumps({"docs": documents}),
-                                     headers={"Content-Type": JSON_MIME})
+        response = self.server._POST(
+            self.name,
+            "_bulk_docs",
+            data=json.dumps({"docs": documents}),
+            headers={"Content-Type": JSON_MIME},
+        )
 
         data = response.json()
         results = []
@@ -517,8 +526,9 @@ class Database:
             raise NotFoundError("missing '_id' item in the document")
         if "_rev" not in doc:
             raise RevisionError("missing '_rev' item in the document")
-        response = self.server._DELETE(self.name, doc["_id"],
-                                       headers={"If-Match": doc["_rev"]})
+        response = self.server._DELETE(
+            self.name, doc["_id"], headers={"If-Match": doc["_rev"]}
+        )
 
     def purge(self, docs):
         """Performs purging (complete removal) of the given list of documents.
@@ -536,9 +546,12 @@ class Database:
                 content[doc["_id"]] = [doc["_rev"]]
             else:
                 raise TypeError("expected dict, got %s" % type(doc))
-        response = self.server._POST(self.name, "_purge",
-                                     data=json.dumps(content),
-                                     headers={"Content-Type": JSON_MIME})
+        response = self.server._POST(
+            self.name,
+            "_purge",
+            data=json.dumps(content),
+            headers={"Content-Type": JSON_MIME},
+        )
         return response.json()
 
     def get_designs(self):
@@ -580,8 +593,9 @@ class Database:
 
         More info: http://docs.couchdb.org/en/latest/api/ddoc/common.html
         """
-        response = self.server._GET(self.name, "_design", designname,
-                                    errors={404: None})
+        response = self.server._GET(
+            self.name, "_design", designname, errors={404: None}
+        )
         if response.status_code == 200:
             current_doc = response.json()
             doc["_id"] = current_doc["_id"]
@@ -594,11 +608,24 @@ class Database:
                 self.view(designname, view, limit=1)
         return True
 
-    def view(self, designname, viewname,
-             key=None, keys=None, startkey=None, endkey=None,
-             skip=None, limit=None, sorted=True, descending=False,
-             group=False, group_level=None, reduce=None, include_docs=False,
-             update=None):
+    def view(
+        self,
+        designname,
+        viewname,
+        key=None,
+        keys=None,
+        startkey=None,
+        endkey=None,
+        skip=None,
+        limit=None,
+        sorted=True,
+        descending=False,
+        group=False,
+        group_level=None,
+        reduce=None,
+        include_docs=False,
+        update=None,
+    ):
         """Query a view index to obtain data and/or documents.
 
         Keyword arguments:
@@ -669,17 +696,20 @@ class Database:
             params["include_docs"] = _jsons(True)
             params["reduce"] = _jsons(False)
         if update is not None:
-            assert update in ["true","false","lazy"]
+            assert update in ["true", "false", "lazy"]
             params["update"] = update
-        response = self.server._GET(self.name, "_design", designname,
-                                    "_view", viewname, params=params)
+        response = self.server._GET(
+            self.name, "_design", designname, "_view", viewname, params=params
+        )
         data = response.json()
-        return ViewResult([Row(r.get("id"),
-                               r.get("key"),
-                               r.get("value"),
-                               r.get("doc")) for r in data.get("rows", [])],
-                          data.get("offset"),
-                          data.get("total_rows"))
+        return ViewResult(
+            [
+                Row(r.get("id"), r.get("key"), r.get("value"), r.get("doc"))
+                for r in data.get("rows", [])
+            ],
+            data.get("offset"),
+            data.get("total_rows"),
+        )
 
     def get_indexes(self):
         """Returns a list of all indexes in the database.
@@ -722,8 +752,18 @@ class Database:
         assert self.server.version >= "2.0"
         self.server._DELETE(self.name, "_index", designname, "json", name)
 
-    def find(self, selector, limit=None, skip=None, sort=None, fields=None,
-             use_index=None, bookmark=None, update=True, conflicts=False):
+    def find(
+        self,
+        selector,
+        limit=None,
+        skip=None,
+        sort=None,
+        fields=None,
+        use_index=None,
+        bookmark=None,
+        update=True,
+        conflicts=False,
+    ):
         """Selects documents according to the Mango index `selector`.
 
         - `selector`: The Mango index. For more information on selector syntax,
@@ -748,9 +788,11 @@ class Database:
         CouchDB version >= 2.0
         """
         assert self.server.version >= "2.0"
-        doc = {"selector": selector,
-               "update": bool(update),
-               "conflicts": bool(conflicts)}
+        doc = {
+            "selector": selector,
+            "update": bool(update),
+            "conflicts": bool(conflicts),
+        }
         if limit is not None:
             doc["limit"] = limit
         if skip is not None:
@@ -766,8 +808,9 @@ class Database:
         response = self.server._POST(self.name, "_find", json=doc)
         return response.json()
 
-    def explain(self, selector, limit=None, skip=None, 
-                sort=None, fields=None, bookmark=None):
+    def explain(
+        self, selector, limit=None, skip=None, sort=None, fields=None, bookmark=None
+    ):
         """Return info on which index is being used by the query.
 
         - `selector`: The Mango index. For more information on selector syntax,
@@ -805,8 +848,7 @@ class Database:
             params = {"rev": doc["_rev"]}
         except KeyError:
             params = {}
-        response = self.server._GET(self.name, doc["_id"], filename,
-                                    params=params)
+        response = self.server._GET(self.name, doc["_id"], filename, params=params)
         return io.BytesIO(response.content)
 
     def put_attachment(self, doc, content, filename=None, content_type=None):
@@ -830,10 +872,12 @@ class Database:
                 raise ValueError("could not figure out filename")
         if not content_type:
             (content_type, enc) = mimetypes.guess_type(filename, strict=False)
-            if not content_type: content_type = BIN_MIME
+            if not content_type:
+                content_type = BIN_MIME
         headers = {"Content-Type": content_type, "If-Match": doc["_rev"]}
-        response = self.server._PUT(self.name, doc["_id"], filename,
-                                    data=content, headers=headers)
+        response = self.server._PUT(
+            self.name, doc["_id"], filename, data=content, headers=headers
+        )
         doc["_rev"] = response.json()["rev"]
         # Return the new `_rev` for backwards compatibility reasons.
         return doc["_rev"]
@@ -848,17 +892,30 @@ class Database:
             headers = {"If-Match": doc["_rev"]}
         except KeyError:
             headers = {}
-        response = self.server._DELETE(self.name, doc["_id"], filename,
-                                       headers=headers)
+        response = self.server._DELETE(self.name, doc["_id"], filename, headers=headers)
         doc["_rev"] = response.json()["rev"]
         # Return the new `_rev` for backwards compatibility reasons.
         return doc["_rev"]
 
-    def changes(self, doc_ids=None, conflicts=None, descending=None,
-                feed="normal", filter=None, heartbeat=None, include_docs=None,
-                attachments=None, att_encoding_info=None, last_event_id=None,
-                limit=None, since=None, style=None, timeout=None, view=None,
-                seq_interval=None):
+    def changes(
+        self,
+        doc_ids=None,
+        conflicts=None,
+        descending=None,
+        feed="normal",
+        filter=None,
+        heartbeat=None,
+        include_docs=None,
+        attachments=None,
+        att_encoding_info=None,
+        last_event_id=None,
+        limit=None,
+        since=None,
+        style=None,
+        timeout=None,
+        view=None,
+        seq_interval=None,
+    ):
         """Returns a sorted list of changes made to documents in the database,
         in time order of application.
 
@@ -903,10 +960,11 @@ class Database:
         if seq_interval is not None:
             params["seq_interval"] = _jsons(seq_interval)
         headers = {"Content-Type": JSON_MIME}
-        response = self.server._POST(self.name, "_changes",
-                                     params=params, json=data, headers=headers)
+        response = self.server._POST(
+            self.name, "_changes", params=params, json=data, headers=headers
+        )
         return response.json()
-            
+
     def dump(self, filepath, callback=None, exclude_designs=False, progressbar=False):
         """Dumps the entire database to a `tar` file.
 
@@ -945,7 +1003,7 @@ class Database:
                 ndocs += 1
                 # Attachments must follow their document.
                 for attname in doc.get("_attachments", dict()):
-                    name = u"{}_att/{}".format(doc["_id"], attname)
+                    name = "{}_att/{}".format(doc["_id"], attname)
                     info = tarfile.TarInfo(name)
                     attfile = self.get_attachment(doc, attname)
                     attdata = attfile.read()
@@ -999,9 +1057,10 @@ class Database:
                     self.put(doc)
                     ndocs += 1
                     for attname, attinfo in list(atts.items()):
-                        key = u"{}_att/{}".format(doc["_id"], attname)
-                        atts[key] = dict(filename=attname,
-                                         content_type=attinfo["content_type"])
+                        key = "{}_att/{}".format(doc["_id"], attname)
+                        atts[key] = dict(
+                            filename=attname, content_type=attinfo["content_type"]
+                        )
                 if ndocs % 100 == 0 and callback:
                     callback(ndocs, nfiles)
         return (ndocs, nfiles)
@@ -1013,10 +1072,10 @@ class _DatabaseIterator(object):
     def __init__(self, db):
         self.db = db
         self.chunks = []
-        ids = list(db.ids()) # Snapshot of all doc id's in db.
+        ids = list(db.ids())  # Snapshot of all doc id's in db.
         for i in range(0, len(ids), CHUNK_SIZE):
-            self.chunks.append(ids[i:i+CHUNK_SIZE])
-        self.chunks.reverse()   # To allow efficient pop.
+            self.chunks.append(ids[i : i + CHUNK_SIZE])
+        self.chunks.reverse()  # To allow efficient pop.
         self.current_chunk = []
 
     def __iter__(self):
@@ -1030,7 +1089,7 @@ class _DatabaseIterator(object):
                 raise StopIteration
             chunk = self.db.get_bulk(self.chunks.pop())
             self.current_chunk = [d for d in chunk if d is not None]
-            self.current_chunk.reverse() # To allow efficient pop.
+            self.current_chunk.reverse()  # To allow efficient pop.
             return next(self)
 
 
@@ -1096,18 +1155,20 @@ class ServerError(CouchDB2Exception):
     "Internal CouchDB server error."
 
 
-_ERRORS = {200: None,
-           201: None,
-           202: None,
-           304: None,
-           400: BadRequestError,
-           401: AuthorizationError,
-           403: AuthorizationError,
-           404: NotFoundError,
-           409: RevisionError,
-           412: CreationError,
-           415: ContentTypeError,
-           500: ServerError}
+_ERRORS = {
+    200: None,
+    201: None,
+    202: None,
+    304: None,
+    400: BadRequestError,
+    401: AuthorizationError,
+    403: AuthorizationError,
+    404: NotFoundError,
+    409: RevisionError,
+    412: CreationError,
+    415: ContentTypeError,
+    500: ServerError,
+}
 
 
 def _jsons(data, indent=None):
@@ -1117,131 +1178,234 @@ def _jsons(data, indent=None):
 
 def _get_parser():
     "Get the parser for the command line tool."
-    p = argparse.ArgumentParser(prog="couchdb2", usage="%(prog)s [options]",
-                                description="CouchDB v2.x command line tool,"
-                                            " leveraging Python module CouchDB2.")
-    p.add_argument("--settings", metavar="FILEPATH",
-                   help="Settings file in JSON format.")
-    p.add_argument("-S", "--server",
-                   help="CouchDB server URL, including port number.")
+    p = argparse.ArgumentParser(
+        prog="couchdb2",
+        usage="%(prog)s [options]",
+        description="CouchDB v2.x command line tool,"
+        " leveraging Python module CouchDB2.",
+    )
+    p.add_argument(
+        "--settings", metavar="FILEPATH", help="Settings file in JSON format."
+    )
+    p.add_argument("-S", "--server", help="CouchDB server URL, including port number.")
     p.add_argument("-d", "--database", help="Database to operate on.")
     p.add_argument("-u", "--username", help="CouchDB user account name.")
 
     x01 = p.add_mutually_exclusive_group()
     x01.add_argument("-p", "--password", help="CouchDB user account password.")
-    x01.add_argument("-q", "--password_question", action="store_true",
-                     help="Ask for the password by interactive input.")
+    x01.add_argument(
+        "-q",
+        "--password_question",
+        action="store_true",
+        help="Ask for the password by interactive input.",
+    )
 
-    p.add_argument("--ca_file", metavar="FILE_OR_DIRPATH",
-                   help="File or directory containing CAs.")
-    p.add_argument("-o", "--output", metavar="FILEPATH",
-                   help="Write output to the given file (JSON format).")
-    p.add_argument("--indent", type=int, metavar="INT",
-                   help="Indentation level for JSON format output file.")
-    p.add_argument("-y", "--yes", action="store_true",
-                   help="Do not ask for confirmation (delete, destroy, undump).")
+    p.add_argument(
+        "--ca_file", metavar="FILE_OR_DIRPATH", help="File or directory containing CAs."
+    )
+    p.add_argument(
+        "-o",
+        "--output",
+        metavar="FILEPATH",
+        help="Write output to the given file (JSON format).",
+    )
+    p.add_argument(
+        "--indent",
+        type=int,
+        metavar="INT",
+        help="Indentation level for JSON format output file.",
+    )
+    p.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Do not ask for confirmation (delete, destroy, undump).",
+    )
 
     x02 = p.add_mutually_exclusive_group()
-    x02.add_argument("-v", "--verbose", action="store_true",
-                     help="Print more information.")
-    x02.add_argument("-s", "--silent", action="store_true",
-                     help="Print no information.")
+    x02.add_argument(
+        "-v", "--verbose", action="store_true", help="Print more information."
+    )
+    x02.add_argument(
+        "-s", "--silent", action="store_true", help="Print no information."
+    )
 
     g0 = p.add_argument_group("server operations")
-    g0.add_argument("-V", "--version", action="store_true",
-                    help="Output CouchDB server version.")
-    g0.add_argument("--list", action="store_true",
-                    help="Output a list of the databases on the server.")
+    g0.add_argument(
+        "-V", "--version", action="store_true", help="Output CouchDB server version."
+    )
+    g0.add_argument(
+        "--list",
+        action="store_true",
+        help="Output a list of the databases on the server.",
+    )
 
     g1 = p.add_argument_group("Database operations.")
 
     x11 = g1.add_mutually_exclusive_group()
-    x11.add_argument("--create", action="store_true",
-                     help="Create the database.")
-    x11.add_argument("--destroy", action="store_true",
-                     help="Delete the database and all its contents.")
+    x11.add_argument("--create", action="store_true", help="Create the database.")
+    x11.add_argument(
+        "--destroy",
+        action="store_true",
+        help="Delete the database and all its contents.",
+    )
 
-    g1.add_argument("--compact", action="store_true",
-                    help="Compact the database; may take some time.")
-    g1.add_argument("--compact_design", metavar="DDOC",
-                    help="Compact the view indexes for the named design doc.")
-    g1.add_argument("--view_cleanup", action="store_true",
-                    help="Remove view index files no longer required.")
-    g1.add_argument("--info", action="store_true",
-                    help="Output information about the database.")
+    g1.add_argument(
+        "--compact",
+        action="store_true",
+        help="Compact the database; may take some time.",
+    )
+    g1.add_argument(
+        "--compact_design",
+        metavar="DDOC",
+        help="Compact the view indexes for the named design doc.",
+    )
+    g1.add_argument(
+        "--view_cleanup",
+        action="store_true",
+        help="Remove view index files no longer required.",
+    )
+    g1.add_argument(
+        "--info", action="store_true", help="Output information about the database."
+    )
 
     x12 = g1.add_mutually_exclusive_group()
-    x12.add_argument("--security", action="store_true",
-                     help="Output security information for the database.")
-    x12.add_argument("--set_security", metavar="FILEPATH",
-                     help="Set security information for the database"
-                          " from the JSON file.")
+    x12.add_argument(
+        "--security",
+        action="store_true",
+        help="Output security information for the database.",
+    )
+    x12.add_argument(
+        "--set_security",
+        metavar="FILEPATH",
+        help="Set security information for the database" " from the JSON file.",
+    )
 
     x13 = g1.add_mutually_exclusive_group()
-    x13.add_argument("--list_designs", action="store_true",
-                     help="List design documents for the database.")
-    x13.add_argument("--design", metavar="DDOC",
-                     help="Output the named design document.")
-    x13.add_argument("--put_design", nargs=2, metavar=("DDOC", "FILEPATH"),
-                     help="Store the named design document from the file.")
-    x13.add_argument("--delete_design", metavar="DDOC",
-                     help="Delete the named design document.")
+    x13.add_argument(
+        "--list_designs",
+        action="store_true",
+        help="List design documents for the database.",
+    )
+    x13.add_argument(
+        "--design", metavar="DDOC", help="Output the named design document."
+    )
+    x13.add_argument(
+        "--put_design",
+        nargs=2,
+        metavar=("DDOC", "FILEPATH"),
+        help="Store the named design document from the file.",
+    )
+    x13.add_argument(
+        "--delete_design", metavar="DDOC", help="Delete the named design document."
+    )
 
     x14 = g1.add_mutually_exclusive_group()
-    x14.add_argument("--dump", metavar="FILEPATH",
-                     help="Create a dump file of the database.")
-    x14.add_argument("--undump", metavar="FILEPATH",
-                     help="Load a dump file into the database.")
+    x14.add_argument(
+        "--dump", metavar="FILEPATH", help="Create a dump file of the database."
+    )
+    x14.add_argument(
+        "--undump", metavar="FILEPATH", help="Load a dump file into the database."
+    )
 
     g2 = p.add_argument_group("Document operations.")
     x2 = g2.add_mutually_exclusive_group()
-    x2.add_argument("-G", "--get", metavar="DOCID",
-                    help="Output the document with the given identifier.")
-    x2.add_argument("-P", "--put", metavar="FILEPATH",
-                    help="Store the document; arg is literal doc or filepath.")
-    x2.add_argument("--delete", metavar="DOCID",
-                    help="Delete the document with the given identifier.")
+    x2.add_argument(
+        "-G",
+        "--get",
+        metavar="DOCID",
+        help="Output the document with the given identifier.",
+    )
+    x2.add_argument(
+        "-P",
+        "--put",
+        metavar="FILEPATH",
+        help="Store the document; arg is literal doc or filepath.",
+    )
+    x2.add_argument(
+        "--delete",
+        metavar="DOCID",
+        help="Delete the document with the given identifier.",
+    )
 
     g3 = p.add_argument_group("attachments to document")
     x3 = g3.add_mutually_exclusive_group()
-    x3.add_argument("--attach", nargs=2, metavar=("DOCID", "FILEPATH"),
-                    help="Attach the specified file to the given document.")
-    x3.add_argument("--detach", nargs=2, metavar=("DOCID", "FILENAME"),
-                    help="Remove the attached file from the given document.")
-    x3.add_argument("--get_attach", nargs=2, metavar=("DOCID", "FILENAME"),
-                    help="Get the attached file from the given document;"
-                         " write to same filepath or that given by '-o'.")
+    x3.add_argument(
+        "--attach",
+        nargs=2,
+        metavar=("DOCID", "FILEPATH"),
+        help="Attach the specified file to the given document.",
+    )
+    x3.add_argument(
+        "--detach",
+        nargs=2,
+        metavar=("DOCID", "FILENAME"),
+        help="Remove the attached file from the given document.",
+    )
+    x3.add_argument(
+        "--get_attach",
+        nargs=2,
+        metavar=("DOCID", "FILENAME"),
+        help="Get the attached file from the given document;"
+        " write to same filepath or that given by '-o'.",
+    )
 
     g4 = p.add_argument_group("query a design view, returning rows")
-    g4.add_argument("--view", metavar="SPEC",
-                    help="Design view '{design}/{view}' to query.")
+    g4.add_argument(
+        "--view", metavar="SPEC", help="Design view '{design}/{view}' to query."
+    )
 
     x41 = g4.add_mutually_exclusive_group()
-    x41.add_argument("--key", metavar="KEY",
-                     help="Key value selecting view rows.")
-    x41.add_argument("--startkey", metavar="KEY",
-                     help="Start key value selecting range of view rows.")
+    x41.add_argument("--key", metavar="KEY", help="Key value selecting view rows.")
+    x41.add_argument(
+        "--startkey",
+        metavar="KEY",
+        help="Start key value selecting range of view rows.",
+    )
 
-    g4.add_argument("--endkey", metavar="KEY",
-                    help="End key value selecting range of view rows.")
-    g4.add_argument("--startkey_docid", metavar="DOCID",
-                    help="Return rows starting with the specified document.")
-    g4.add_argument("--endkey_docid", metavar="DOCID",
-                    help="Stop returning rows when specified document reached.")
-    g4.add_argument("--group", action="store_true",
-                    help="Group the results using the 'reduce' function.")
-    g4.add_argument("--group_level", type=int, metavar="INT",
-                    help="Specify the group level to use.")
-    g4.add_argument("--noreduce", action="store_true",
-                    help="Do not use the 'reduce' function of the view.")
-    g4.add_argument("--limit", type=int, metavar="INT",
-                    help="Limit the number of returned rows.")
-    g4.add_argument("--skip", type=int, metavar="INT",
-                    help="Skip this number of rows before returning result.")
-    g4.add_argument("--descending", action="store_true",
-                    help="Sort rows in descending order (swap start/end keys!).")
-    g4.add_argument("--include_docs", action="store_true",
-                    help="Include documents in result.")
+    g4.add_argument(
+        "--endkey", metavar="KEY", help="End key value selecting range of view rows."
+    )
+    g4.add_argument(
+        "--startkey_docid",
+        metavar="DOCID",
+        help="Return rows starting with the specified document.",
+    )
+    g4.add_argument(
+        "--endkey_docid",
+        metavar="DOCID",
+        help="Stop returning rows when specified document reached.",
+    )
+    g4.add_argument(
+        "--group",
+        action="store_true",
+        help="Group the results using the 'reduce' function.",
+    )
+    g4.add_argument(
+        "--group_level", type=int, metavar="INT", help="Specify the group level to use."
+    )
+    g4.add_argument(
+        "--noreduce",
+        action="store_true",
+        help="Do not use the 'reduce' function of the view.",
+    )
+    g4.add_argument(
+        "--limit", type=int, metavar="INT", help="Limit the number of returned rows."
+    )
+    g4.add_argument(
+        "--skip",
+        type=int,
+        metavar="INT",
+        help="Skip this number of rows before returning result.",
+    )
+    g4.add_argument(
+        "--descending",
+        action="store_true",
+        help="Sort rows in descending order (swap start/end keys!).",
+    )
+    g4.add_argument(
+        "--include_docs", action="store_true", help="Include documents in result."
+    )
     return p
 
 
@@ -1290,10 +1454,12 @@ def _get_settings(pargs):
     return settings
 
 
-DEFAULT_SETTINGS = {"SERVER": "http://localhost:5984",
-                    "DATABASE": None,
-                    "USERNAME": None,
-                    "PASSWORD": None}
+DEFAULT_SETTINGS = {
+    "SERVER": "http://localhost:5984",
+    "DATABASE": None,
+    "USERNAME": None,
+    "PASSWORD": None,
+}
 
 DEFAULT_SETTINGS_FILEPATHS = ["~/.couchdb2", "settings.json"]
 
@@ -1324,15 +1490,20 @@ def _get_database(server, settings):
         sys.exit("Error: no database defined")
     return server[settings["DATABASE"]]
 
+
 def _message(pargs, *args):
     "Unless flag `--silent` was used, print the arguments."
-    if pargs.silent: return
+    if pargs.silent:
+        return
     print(*args)
+
 
 def _verbose(pargs, *args):
     "If flag `--verbose` was used, then print the arguments."
-    if not pargs.verbose: return
+    if not pargs.verbose:
+        return
     print(*args)
+
 
 def _json_output(pargs, data, else_print=False):
     """If `--output` was used, write the data in JSON format to the file.
@@ -1358,25 +1529,30 @@ def _json_output(pargs, data, else_print=False):
         print(_jsons(data, indent=2))
     return bool(pargs.output)
 
+
 def json_input(filepath):
     "Read the JSON document file."
     try:
         with open(filepath, "r") as infile:
-            return json.load(infile, )
+            return json.load(infile)
     except (IOError, ValueError, TypeError) as error:
         sys.exit(f"Error: {error}")
+
 
 def _print_dot(*args):
     "Print a dot without a newline and flush immediately."
     print(".", sep="", end="")
     sys.stdout.flush()
 
+
 def _execute(pargs, settings):
     "Execution of the CouchDB2 command line tool."
-    server = Server(href=settings["SERVER"],
-                    username=settings["USERNAME"],
-                    password=settings["PASSWORD"],
-                    ca_file=pargs.ca_file)
+    server = Server(
+        href=settings["SERVER"],
+        username=settings["USERNAME"],
+        password=settings["PASSWORD"],
+        ca_file=pargs.ca_file,
+    )
     if pargs.verbose and server.user_context:
         print("User context:", _jsons(server.user_context, indent=2))
     if pargs.version:
@@ -1430,7 +1606,7 @@ def _execute(pargs, settings):
         data = _get_database(server, settings).get_designs()
         if not _json_output(pargs, data):
             for row in data["rows"]:
-                print(row["id"][len("_design/"):])
+                print(row["id"][len("_design/") :])
     elif pargs.design:
         db = _get_database(server, settings)
         _json_output(pargs, db.get_design(pargs.get_design), else_print=True)
@@ -1467,24 +1643,25 @@ def _execute(pargs, settings):
             # Non-trivial decision: concluded that it is the basename of
             # the file that is the best identifier for the attachment,
             # not the entire filepath.
-            db.put_attachment(doc, infile,
-                              filename=os.path.basename(pargs.attach[1]))
+            db.put_attachment(doc, infile, filename=os.path.basename(pargs.attach[1]))
         _message(pargs, "Attached file '{1}' to doc '{0}'".format(*pargs.attach))
     elif pargs.detach:
         db = _get_database(server, settings)
         doc = db[pargs.detach[0]]
         db.delete_attachment(doc, pargs.detach[1])
-        _message(pargs,
-                "Detached file '{1}' from doc '{0}'".format(*pargs.detach))
+        _message(pargs, "Detached file '{1}' from doc '{0}'".format(*pargs.detach))
     elif pargs.get_attach:
         db = _get_database(server, settings)
         doc = db[pargs.get_attach[0]]
         filepath = pargs.output or pargs.get_attach[1]
         with open(filepath, "wb") as outfile:
             outfile.write(db.get_attachment(doc, pargs.get_attach[1]).read())
-        _message(pargs,
-                 "Wrote file '{0}' from doc '{1}' attachment '{2}'".format(
-                     filepath, *pargs.get_attach))
+        _message(
+            pargs,
+            "Wrote file '{0}' from doc '{1}' attachment '{2}'".format(
+                filepath, *pargs.get_attach
+            ),
+        )
 
     if pargs.view:
         try:
@@ -1492,9 +1669,19 @@ def _execute(pargs, settings):
         except ValueError:
             sys.exit("Error: invalid view specification")
         kwargs = {}
-        for key in ("key", "startkey", "endkey", "startkey_docid",
-                    "endkey_docid", "group", "group_level", "limit", "skip",
-                    "descending", "include_docs"):
+        for key in (
+            "key",
+            "startkey",
+            "endkey",
+            "startkey_docid",
+            "endkey_docid",
+            "group",
+            "group_level",
+            "limit",
+            "skip",
+            "descending",
+            "include_docs",
+        ):
             value = getattr(pargs, key)
             if value is not None:
                 kwargs[key] = value
