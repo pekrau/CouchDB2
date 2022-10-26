@@ -311,7 +311,7 @@ class Test(unittest.TestCase):
     def test_11_dump(self):
         "Test dumping the contents of a database into a file."
         db = self.server.create(self.settings["DATABASE"])
-        id1 = "mydoc"
+        id1 = "mydocÅÄÖ"
         name1 = "myfile"
         doc1 = {"_id": id1, "name": name1, "contents": "a Python file"}
         db.put(doc1)
