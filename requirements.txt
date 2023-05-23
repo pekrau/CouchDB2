@@ -2,6 +2,6 @@ certifi==2022.12.7
 chardet==4.0.0
 charset-normalizer==2.0.7
 idna==2.10
-requests==2.26.0
+requests==2.31.0
 tqdm==4.62.3
 urllib3==1.26.5
