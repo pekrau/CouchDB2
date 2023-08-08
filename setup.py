@@ -6,7 +6,7 @@ import couchdb2
 setup(
     name="CouchDB2",
     version=couchdb2.__version__,
-    description=couchdb2.__doc__[0],
+    description=couchdb2.__doc__.split("\n")[0],
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/pekrau/CouchDB2",
