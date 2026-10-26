@@ -1,4 +1,4 @@
-certifi==2026.2.25
+certifi==2026.10.19
 chardet==7.4.0.post2
 charset-normalizer==3.4.7
 idna==3.15
